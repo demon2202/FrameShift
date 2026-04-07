@@ -1,0 +1,186 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function idUnchanged() {
+      return !('id' in request.resource.data) || request.resource.data.id == request.auth.uid;
+    }
+    
+    function idNotModified() {
+      return !('id' in request.resource.data) || request.resource.data.id == resource.data.id;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser() {
+      return hasRequiredFields(['id', 'username', 'name']) &&
+             validStringLength('username', 1, 50) &&
+             validStringLength('name', 1, 100) &&
+             (!('bio' in request.resource.data) || validStringLength('bio', 0, 500)) &&
+             (!('avatar' in request.resource.data) || validStringLength('avatar', 0, 1000000)) &&
+             (!('bannerUrl' in request.resource.data) || validStringLength('bannerUrl', 0, 1000000)) &&
+             (!('website' in request.resource.data) || validStringLength('website', 0, 200)) &&
+             (!('location' in request.resource.data) || validStringLength('location', 0, 100));
+    }
+
+    function isValidPoster() {
+      return hasRequiredFields(['title', 'imageUrl', 'creatorId', 'createdAt']) &&
+             validStringLength('title', 1, 200) &&
+             validStringLength('imageUrl', 1, 1000000) &&
+             request.resource.data.creatorId == request.auth.uid &&
+             (!('description' in request.resource.data) || validStringLength('description', 0, 2000));
+    }
+
+    function isValidComment() {
+      return hasRequiredFields(['posterId', 'userId', 'text', 'createdAt']) &&
+             validStringLength('text', 1, 1000) &&
+             request.resource.data.userId == request.auth.uid;
+    }
+
+    function isValidCollection() {
+      return hasRequiredFields(['id', 'userId', 'name', 'createdAt', 'isPrivate', 'posterIds']) &&
+             validStringLength('name', 1, 100) &&
+             request.resource.data.userId == request.auth.uid &&
+             request.resource.data.isPrivate is bool &&
+             request.resource.data.posterIds is list &&
+             (!('description' in request.resource.data) || validStringLength('description', 0, 1000));
+    }
+
+    function isValidThread() {
+      return hasRequiredFields(['participantIds']) &&
+             request.resource.data.participantIds is list &&
+             request.resource.data.participantIds.size() == 2 &&
+             request.auth.uid in request.resource.data.participantIds;
+    }
+
+    function isValidMessage(threadId) {
+      return hasRequiredFields(['threadId', 'senderId', 'text', 'timestamp']) &&
+             request.resource.data.threadId == threadId &&
+             request.resource.data.senderId == request.auth.uid &&
+             validStringLength('text', 0, 2000) &&
+             (!('imageUrl' in request.resource.data) || validStringLength('imageUrl', 1, 1000000));
+    }
+
+    function isValidNotification() {
+      return hasRequiredFields(['type', 'targetUserId', 'time']) &&
+             request.resource.data.type in ['like', 'follow', 'message', 'system', 'comment'];
+    }
+
+    function isValidStory() {
+      return hasRequiredFields(['id', 'userId', 'imageUrl', 'timestamp', 'viewers']) &&
+             request.resource.data.userId == request.auth.uid &&
+             validStringLength('imageUrl', 1, 1000000) &&
+             request.resource.data.viewers is list;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isOwner(userId) && isValidUser() && idUnchanged();
+      allow update: if (isOwner(userId) && isValidUser() && idNotModified()) || 
+                       (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followRequests']));
+    }
+
+    match /posters/{posterId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidPoster();
+      allow update: if isAuthenticated() && resource.data.creatorId == request.auth.uid && isValidPoster() && request.resource.data.creatorId == resource.data.creatorId;
+      allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidComment();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidComment() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /collections/{collectionId} {
+      allow read: if !resource.data.isPrivate || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidCollection();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidCollection() && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /threads/{threadId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participantIds;
+      allow create: if isAuthenticated() && isValidThread();
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participantIds && request.resource.data.participantIds == resource.data.participantIds;
+    }
+
+    match /threads/{threadId}/messages/{messageId} {
+      allow read: if isAuthenticated() && 
+                     (
+                       get(/databases/$(database)/documents/threads/$(threadId)) == null ||
+                       request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participantIds
+                     );
+      allow create: if isAuthenticated() && 
+                       get(/databases/$(database)/documents/threads/$(threadId)) != null &&
+                       request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participantIds && 
+                       isValidMessage(threadId);
+      allow update: if isAuthenticated() && 
+                       get(/databases/$(database)/documents/threads/$(threadId)) != null &&
+                       request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participantIds;
+      allow delete: if isAuthenticated() && 
+                       get(/databases/$(database)/documents/threads/$(threadId)) != null &&
+                       request.auth.uid in get(/databases/$(database)/documents/threads/$(threadId)).data.participantIds &&
+                       resource.data.senderId == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.targetUserId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidNotification();
+      allow update: if isAuthenticated() && resource.data.targetUserId == request.auth.uid && isValidNotification() && request.resource.data.targetUserId == resource.data.targetUserId;
+      allow delete: if isAuthenticated() && resource.data.targetUserId == request.auth.uid;
+    }
+
+    match /stories/{storyId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidStory();
+      allow update: if isAuthenticated() && 
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers']) &&
+                       request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (request.resource.data.followerId == request.auth.uid || request.resource.data.followingId == request.auth.uid);
+      allow delete: if isAuthenticated() && (resource.data.followerId == request.auth.uid || resource.data.followingId == request.auth.uid);
+    }
+  }
+}
