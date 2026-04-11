@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ImageOff, Loader2 } from 'lucide-react';
+import { ImageOff } from 'lucide-react';
 
 interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
@@ -25,8 +25,8 @@ export const OptimizedImage = React.forwardRef<HTMLImageElement, OptimizedImageP
   return (
     <div className={`relative overflow-hidden ${containerClassName}`}>
       {showSkeleton && isLoading && (
-        <div className="absolute inset-0 bg-neutral-200 dark:bg-neutral-800 animate-pulse z-10 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 text-neutral-400 animate-spin opacity-50" />
+        <div className="absolute inset-0 bg-neutral-200 dark:bg-neutral-800 z-10 overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-white/10 to-transparent" />
         </div>
       )}
       

@@ -61,7 +61,7 @@ const CreatorCard: React.FC<CreatorCardProps> = ({ user, isFollowing, onFollow, 
 };
 
 const MarqueeColumn = ({ creators, duration, direction = 'up' }: { creators: { user: User, posterImageUrl: string }[], duration: number, direction?: 'up' | 'down' }) => {
-    const { isFollowing, toggleFollow } = useGlobalContext();
+    const { isFollowing, toggleFollow, user } = useGlobalContext();
     const list = useMemo(() => [...creators, ...creators, ...creators], [creators]);
 
     return (
@@ -77,18 +77,26 @@ const MarqueeColumn = ({ creators, duration, direction = 'up' }: { creators: { u
                 }}
                 className="flex flex-col gap-6"
             >
-                {list.map((creator, idx) => (
-                    <CreatorCard 
-                        key={`${creator.user.id}-${idx}-${direction}`} 
-                        user={creator.user} 
-                        posterImageUrl={creator.posterImageUrl}
-                        isFollowing={isFollowing(creator.user.id)}
-                        onFollow={(e) => {
-                            e.stopPropagation();
-                            toggleFollow(creator.user.id);
-                        }}
-                    />
-                ))}
+                {list.map((creator, idx) => {
+                    const isMe = user?.id === creator.user.id;
+                    const isFollowingUser = isFollowing(creator.user.id);
+                    const showTick = isMe || isFollowingUser;
+
+                    return (
+                        <CreatorCard 
+                            key={`${creator.user.id}-${idx}-${direction}`} 
+                            user={creator.user} 
+                            posterImageUrl={creator.posterImageUrl}
+                            isFollowing={showTick}
+                            onFollow={(e) => {
+                                e.stopPropagation();
+                                if (!isMe) {
+                                    toggleFollow(creator.user.id);
+                                }
+                            }}
+                        />
+                    );
+                })}
             </motion.div>
         </div>
     );

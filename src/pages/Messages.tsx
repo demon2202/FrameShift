@@ -34,7 +34,7 @@ export const Messages: React.FC = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [currentMessages, isOtherUserTyping]);
+  }, [currentMessages.length, isOtherUserTyping]);
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setNewMessage(e.target.value);

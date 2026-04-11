@@ -23,7 +23,7 @@ export const Profile: React.FC = () => {
   const [activeList, setActiveList] = useState<'followers' | 'following' | null>(null);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
 
-  const { savedPosters, user: currentUser, logout, posters, allUsers, toggleFollow, isFollowing, hasRequestedFollow, cancelFollowRequest, getLikeCount, setUploadModalMode, blockUser, getUserStats, getFollowers, getFollowing, collections } = useGlobalContext();
+  const { savedPosters, user: currentUser, logout, posters, allUsers, toggleFollow, isFollowing, hasRequestedFollow, cancelFollowRequest, getLikeCount, setUploadModalMode, blockUser, getUserStats, getFollowers, getFollowing, collections, isDataLoading } = useGlobalContext();
   const { userId } = useParams();
 
   // Determine which user profile to show
@@ -408,7 +408,13 @@ export const Profile: React.FC = () => {
                                 </>
                             )}
 
-                            {(activeTab === 'posters' ? myPosters : savedPosterData).length > 0 ? (
+                            {isDataLoading ? (
+                                [...Array(6)].map((_, i) => (
+                                    <div key={`skeleton-${i}`} className="aspect-[3/4] relative overflow-hidden bg-neutral-200 dark:bg-neutral-800">
+                                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-white/10 to-transparent" />
+                                    </div>
+                                ))
+                            ) : (activeTab === 'posters' ? myPosters : savedPosterData).length > 0 ? (
                                 (activeTab === 'posters' ? myPosters : savedPosterData).map((poster, idx) => (
                                     <motion.div 
                                         key={poster.id}

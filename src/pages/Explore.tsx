@@ -18,7 +18,8 @@ export const Explore: React.FC = () => {
   const [activeInfoModal, setActiveInfoModal] = useState<InfoType | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'recommended' | 'latest' | 'trending'>('recommended');
-  const { posters, likedPosters, savedPosters, user, toggleFollow, isFollowing } = useGlobalContext();
+  const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
+  const { posters, likedPosters, savedPosters, user, toggleFollow, isFollowing, isDataLoading } = useGlobalContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -373,10 +374,15 @@ export const Explore: React.FC = () => {
         </div>
 
         {/* Desktop Fanned Cards */}
-        <div className="hidden md:flex justify-center items-center h-[500px] relative perspective-1000 overflow-hidden">
+        <div 
+          className="hidden md:flex justify-center items-center h-[500px] relative perspective-1000 overflow-hidden"
+          onMouseLeave={() => setHoveredCardIndex(null)}
+        >
           {dailyTrendingPosters.slice(0, 5).map((poster, index) => {
             const rotation = (index - 2) * 12;
             const yOffset = Math.abs(index - 2) * 25;
+            const isHovered = hoveredCardIndex === index;
+            const baseZIndex = 5 - Math.abs(index - 2);
 
             return (
               <motion.div
@@ -385,10 +391,11 @@ export const Explore: React.FC = () => {
                 whileInView={{ rotate: rotation, y: yOffset, opacity: 1 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ duration: 0.8, delay: index * 0.1, type: "spring", bounce: 0.4 }}
+                onMouseEnter={() => setHoveredCardIndex(index)}
                 className="absolute w-72 lg:w-80 aspect-[3/4] cursor-pointer origin-bottom group"
                 style={{
-                  zIndex: 5 - Math.abs(index - 2),
                   left: `calc(50% - 144px + ${(index - 2) * 70}px)`,
+                  zIndex: isHovered ? 50 : baseZIndex,
                 }}
               >
                 <motion.div
@@ -397,6 +404,7 @@ export const Explore: React.FC = () => {
                     whileHover={{ scale: 1.05, y: -20, transition: { duration: 0.3 } }}
                     onClick={() => setSelectedPoster(poster)}
                     className="w-full h-full rounded-2xl overflow-hidden shadow-2xl border-4 border-white dark:border-neutral-800 relative"
+                    style={{ willChange: "transform" }}
                 >
                     <OptimizedImage
                       src={poster.imageUrl}
@@ -404,8 +412,8 @@ export const Explore: React.FC = () => {
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       containerClassName="w-full h-full"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-                      <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6" style={{ willChange: 'opacity' }}>
+                      <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300 will-change-transform">
                         <h3 className="text-white font-display font-bold text-2xl uppercase leading-tight mb-1">
                           {poster.title}
                         </h3>
@@ -537,7 +545,12 @@ export const Explore: React.FC = () => {
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {realUsers.map((u, i) => (
+                {realUsers.map((u, i) => {
+                  const isMe = user?.id === u.id;
+                  const isFollowingUser = isFollowing(u.id);
+                  const showTick = isMe || isFollowingUser;
+
+                  return (
                   <div key={u.id} className="flex items-center justify-between group cursor-pointer p-4 border border-cream/10 hover:border-neon-lime transition-colors bg-cream/5 backdrop-blur-sm">
                     <div className="flex items-center gap-4">
                       <span className="font-mono text-neon-lime/50 text-xs">0{i + 1}</span>
@@ -558,21 +571,23 @@ export const Explore: React.FC = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (user) {
-                          toggleFollow(u.id);
+                          if (!isMe) {
+                            toggleFollow(u.id);
+                          }
                         } else {
                           navigate('/login');
                         }
                       }}
                       className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${
-                        isFollowing(u.id)
+                        showTick
                           ? 'bg-white/10 border-white/20 text-white hover:bg-red-500/20 hover:text-red-500 hover:border-red-500/50'
                           : 'border-cream/20 group-hover:bg-neon-lime group-hover:text-olive-dark group-hover:border-neon-lime'
                       }`}
                     >
-                      {isFollowing(u.id) ? <Check size={16} /> : <Plus size={16} />}
+                      {showTick ? <Check size={16} /> : <Plus size={16} />}
                     </button>
                   </div>
-                ))}
+                )})}
               </div>
               
               <button 
@@ -774,7 +789,7 @@ export const Explore: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
           <div className="lg:col-span-3 min-h-[400px]">
-            <Feed posters={filteredPosters.slice(0, visibleCount)} onPosterClick={setSelectedPoster} />
+            <Feed posters={filteredPosters.slice(0, visibleCount)} onPosterClick={setSelectedPoster} isLoading={isDataLoading} />
             {visibleCount < filteredPosters.length && (
               <div ref={loadMoreRef} className="w-full py-8 flex justify-center items-center">
                 <div className="w-6 h-6 border-2 border-neon-lime border-t-transparent rounded-full animate-spin" />

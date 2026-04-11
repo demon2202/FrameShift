@@ -83,9 +83,6 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({ poster, onCli
             {/* Hover Overlay */}
             <div className={`absolute inset-0 bg-gradient-to-t from-olive-dark/80 via-olive-dark/20 to-transparent mix-blend-multiply opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
             
-            {/* Glare Effect */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity duration-700 pointer-events-none bg-[linear-gradient(105deg,transparent_20%,white_25%,transparent_30%)] bg-[length:200%_200%] bg-[position:-100%_0] group-hover:bg-[position:200%_0]" />
-            
             {/* Corner Accent */}
             <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="bg-neon-lime text-olive-dark p-1">

@@ -11,6 +11,8 @@ interface UploadModalProps {
   onClose: () => void;
 }
 
+import toast from 'react-hot-toast';
+
 export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
   const { user, addPoster, addStory, compressImage, submitToChallenge, challenge, uploadModalMode, setUploadModalMode } = useGlobalContext();
   
@@ -556,6 +558,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
 
     setIsLoading(false);
     setIsSuccess(true);
+    toast.success(uploadModalMode === 'poster' ? 'Poster uploaded successfully!' : 'Story posted successfully!');
     
     // Wait for success animation
     setTimeout(() => {

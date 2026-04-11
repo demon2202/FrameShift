@@ -8,8 +8,6 @@ import { useGlobalContext } from '../context/GlobalContext';
 import { RemixModal } from './RemixModal';
 import { OptimizedImage } from './ui/OptimizedImage';
 
-import { SaveToCollectionModal } from './SaveToCollectionModal';
-
 interface PosterModalProps {
   poster: Poster | null;
   onClose: () => void;
@@ -19,7 +17,7 @@ interface PosterModalProps {
 export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPosterClick }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const navigate = useNavigate();
-  const { isFollowing, isFollowedBy, toggleFollow, isSaved, isLiked, toggleLike, posters, user, addComment, getComments, deletePoster, sendMessage, allUsers, getOrCreateThread } = useGlobalContext();
+  const { isFollowing, isFollowedBy, toggleFollow, isSaved, toggleSave, isLiked, toggleLike, posters, user, addComment, getComments, deletePoster, sendMessage, allUsers, getOrCreateThread } = useGlobalContext();
   const [cachedPoster, setCachedPoster] = useState<Poster | null>(poster);
   
   // Use cached poster for rendering to support exit animations when prop becomes null
@@ -132,7 +130,6 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
   const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isRemixOpen, setIsRemixOpen] = useState(false);
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [extractedColors, setExtractedColors] = useState<string[]>([]);
   
@@ -642,7 +639,7 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
                                     {liked ? 'Liked' : 'Like'}
                                 </button>
                                 <button 
-                                    onClick={(e) => {e.stopPropagation(); setIsSaveModalOpen(true)}}
+                                    onClick={(e) => {e.stopPropagation(); toggleSave(activePoster.id)}}
                                     className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold uppercase tracking-wider text-xs transition-all duration-300 ${saved ? 'bg-neon-lime/10 text-neon-lime border border-neon-lime/30' : 'bg-white/5 text-white hover:bg-white/10 border border-transparent'}`}
                                 >
                                     <Bookmark size={16} className={saved ? 'fill-neon-lime' : ''} />
@@ -908,14 +905,6 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
             isOpen={isRemixOpen} 
             onClose={() => setIsRemixOpen(false)} 
             originalPoster={activePoster}
-        />
-    )}
-
-    {activePoster && (
-        <SaveToCollectionModal
-            isOpen={isSaveModalOpen}
-            onClose={() => setIsSaveModalOpen(false)}
-            poster={activePoster}
         />
     )}
 

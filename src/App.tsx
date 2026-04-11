@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Explore } from './pages/Explore';
@@ -8,10 +8,12 @@ import { Analytics } from './pages/Analytics';
 import { Messages } from './pages/Messages';
 import { Login } from './pages/Login';
 import { BottomNav } from './components/BottomNav';
-import { GlobalProvider } from './context/GlobalContext';
+import { GlobalProvider, useGlobalContext } from './context/GlobalContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 import { OnboardingModal } from './components/OnboardingModal';
+
+import { Toaster } from 'react-hot-toast';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -22,15 +24,64 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </main>
       <BottomNav />
       <OnboardingModal />
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+            border: '1px solid #ccff00',
+            borderRadius: '8px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#ccff00',
+              secondary: '#1a1a1a',
+            },
+          },
+        }}
+      />
     </div>
   );
 };
 
+import { AppSkeleton } from './components/AppSkeleton';
+
+import { AnimatePresence, motion } from 'framer-motion';
+
 const AppContent: React.FC = () => {
+  const { isLoading } = useGlobalContext();
+  const [minTimePassed, setMinTimePassed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimePassed(true);
+    }, 2500); // 2.5 seconds minimum loading time
+    return () => clearTimeout(timer);
+  }, []);
+
+  const showLoading = isLoading || !minTimePassed;
+
   return (
-    <HashRouter>
-      <AppLayout>
-        <Routes>
+    <>
+      <AnimatePresence mode="wait">
+        {showLoading && (
+          <motion.div
+            key="loading-screen"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+            className="fixed inset-0 z-[9999]"
+          >
+            <AppSkeleton />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {!showLoading && (
+        <HashRouter>
+          <AppLayout>
+            <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/explore" element={<Explore />} />
@@ -75,6 +126,8 @@ const AppContent: React.FC = () => {
         </Routes>
       </AppLayout>
     </HashRouter>
+    )}
+    </>
   );
 };
 

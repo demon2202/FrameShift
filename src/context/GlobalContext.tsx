@@ -3,6 +3,7 @@ import { User, Poster, Follow, Message, Story, Like, Saved, Notification, Commen
 import { db, auth, googleProvider } from '../firebase';
 import { collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, arrayUnion, arrayRemove, writeBatch, addDoc, increment } from 'firebase/firestore';
 import { signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import toast from 'react-hot-toast';
 
 enum OperationType {
   CREATE = 'create',
@@ -46,6 +47,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 interface GlobalContextType {
   user: User | null;
   isLoading: boolean;
+  isDataLoading: boolean;
   login: () => Promise<void>;
   loginWithEmail: (e: string, p: string) => Promise<void>;
   registerWithEmail: (e: string, p: string, u: string, n: string) => Promise<void>;
@@ -132,7 +134,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [posters, setPosters] = useState<Poster[]>([]);
   const [follows, setFollows] = useState<Follow[]>([]);
   const [likes, setLikes] = useState<Like[]>([]);
-  const [saves] = useState<Saved[]>([]);
+  const [saves, setSaves] = useState<Saved[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [stories, setStories] = useState<Story[]>([]);
@@ -141,6 +143,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
@@ -228,7 +231,11 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const unsubPosters = onSnapshot(collection(db, 'posters'), (snapshot) => {
       setPosters(snapshot.docs.map(doc => doc.data() as Poster));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'posters'));
+      setIsDataLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'posters');
+      setIsDataLoading(false);
+    });
 
     const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
       setComments(snapshot.docs.map(doc => doc.data() as Comment));
@@ -312,10 +319,19 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       (error) => handleFirestoreError(error, OperationType.LIST, 'collections')
     );
 
+    const unsubSaves = onSnapshot(
+      query(collection(db, 'saves'), where('userId', '==', user.id)),
+      (snapshot) => {
+        setSaves(snapshot.docs.map(doc => doc.data() as Saved));
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, 'saves')
+    );
+
     return () => {
       unsubThreads();
       unsubNotifs();
       unsubCollections();
+      unsubSaves();
       Object.values(messageUnsubsRef.current).forEach(unsub => unsub());
       messageUnsubsRef.current = {};
     };
@@ -983,8 +999,32 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return likes.filter(l => l.posterId === posterId).length;
   };
 
-  const toggleSave = () => {};
-  const isSaved = () => false;
+  const toggleSave = async (posterId: string) => {
+    if (!user) return;
+    const saveId = `${user.id}_${posterId}`;
+    const isS = isSaved(posterId);
+    
+    try {
+      if (isS) {
+        await deleteDoc(doc(db, 'saves', saveId));
+        toast.success('Removed from saved');
+      } else {
+        await setDoc(doc(db, 'saves', saveId), {
+          userId: user.id,
+          posterId: posterId,
+          createdAt: new Date().toISOString()
+        });
+        toast.success('Saved to collection');
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `saves/${saveId}`);
+    }
+  };
+
+  const isSaved = (posterId: string) => {
+    if (!user) return false;
+    return saves.some(s => s.userId === user.id && s.posterId === posterId);
+  };
 
   const getOrCreateThread = async (otherUserId: string) => {
     if (!user) throw new Error("Not logged in");
@@ -1302,7 +1342,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   return (
     <GlobalContext.Provider value={{
-      user, isLoading, login, loginWithEmail, registerWithEmail, logout, updateUserProfile,
+      user, isLoading, isDataLoading, login, loginWithEmail, registerWithEmail, logout, updateUserProfile,
       allUsers, posters, getAllPosters, getFeed, getUserPosters, getUserStats,
       getFollowers, getFollowing, getStories, getConversations, getMessages, getComments,
       addPoster, deletePoster, toggleFollow, isFollowing, isFollowedBy, hasRequestedFollow,

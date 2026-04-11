@@ -43,6 +43,7 @@ export default {
         'shine': 'shine 8s ease-in-out infinite',
         'marquee': 'marquee 25s linear infinite',
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'shimmer': 'shimmer 1.5s infinite linear',
       },
       keyframes: {
         shine: {
@@ -52,6 +53,10 @@ export default {
         marquee: {
           '0%': { transform: 'translateX(0%)' },
           '100%': { transform: 'translateX(-100%)' },
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
         }
       },
       backgroundImage: {

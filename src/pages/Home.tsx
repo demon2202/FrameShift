@@ -18,7 +18,7 @@ import { InfoModal, InfoType } from '../components/InfoModal';
 
 export const Home: React.FC = () => {
   // 1. Unconditional Hook Calls
-  const { getFeed, getStories, user, posters, setIsUploadOpen, isUploadOpen, setUploadModalMode, isFollowing } = useGlobalContext();
+  const { getFeed, getStories, user, posters, setIsUploadOpen, isUploadOpen, setUploadModalMode, isFollowing, isDataLoading } = useGlobalContext();
   const [selectedPoster, setSelectedPoster] = useState<Poster | null>(null);
   const [activeInfoModal, setActiveInfoModal] = useState<InfoType | null>(null);
   const [viewingStoryUserIndex, setViewingStoryUserIndex] = useState<number | null>(null);
@@ -367,9 +367,9 @@ export const Home: React.FC = () => {
                         </div>
                     </div>
 
-                    {filteredFeed.length > 0 ? (
+                    {filteredFeed.length > 0 || isDataLoading ? (
                         <>
-                            <Feed posters={filteredFeed.slice(0, visibleCount)} onPosterClick={setSelectedPoster} />
+                            <Feed posters={filteredFeed.slice(0, visibleCount)} onPosterClick={setSelectedPoster} isLoading={isDataLoading} />
                             {visibleCount < filteredFeed.length && (
                                 <div ref={loadMoreRef} className="w-full py-8 flex justify-center items-center">
                                     <div className="w-6 h-6 border-2 border-neon-lime border-t-transparent rounded-full animate-spin" />

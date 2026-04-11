@@ -9,9 +9,10 @@ import { Link } from 'react-router-dom';
 interface FeedProps {
   posters: Poster[];
   onPosterClick: (poster: Poster) => void;
+  isLoading?: boolean;
 }
 
-export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick }) => {
+export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick, isLoading }) => {
   const [visibleCount, setVisibleCount] = useState(12);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +43,34 @@ export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick }) => {
   }, [visibleCount, posters.length]);
 
   const visiblePosters = posters.slice(0, visibleCount);
+
+  if (isLoading) {
+    return (
+      <div className="columns-1 sm:columns-2 md:columns-3 gap-8 space-y-8">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="break-inside-avoid mb-6">
+            <div className={`w-full bg-neutral-200 dark:bg-neutral-800/50 rounded-sm relative overflow-hidden ${i % 2 === 0 ? 'aspect-[3/4]' : 'aspect-square'} border border-olive-dark/5 dark:border-white/5`}>
+                {/* Modern shimmer effect */}
+                <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-neutral-200 dark:bg-neutral-800/50 relative overflow-hidden">
+                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
+                    </div>
+                    <div className="w-20 h-3 rounded-full bg-neutral-200 dark:bg-neutral-800/50 relative overflow-hidden">
+                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
+                    </div>
+                </div>
+                <div className="w-8 h-3 rounded-full bg-neutral-200 dark:bg-neutral-800/50 relative overflow-hidden">
+                    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
+                </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (posters.length === 0) {
     return (
@@ -84,13 +113,12 @@ export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick }) => {
             <motion.div
                 layout
                 key={poster.id}
-                initial={{ opacity: 0, y: 50, scale: 0.9 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ 
-                    type: "spring",
-                    stiffness: 100,
-                    damping: 20,
+                    duration: 0.5,
+                    ease: "easeOut",
                     delay: (i % 4) * 0.1 
                 }}
                 className="break-inside-avoid mb-6"
