@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { X, Heart, Share2, Download, Check, Palette, Shield, Bookmark, AlertTriangle, Sparkles, Shuffle, Plus, MessageCircle, Send, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Eye, EyeOff } from 'lucide-react';
+import { X, Heart, Share2, Download, Check, Palette, Shield, Bookmark, AlertTriangle, Sparkles, Shuffle, Plus, MessageCircle, Send, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCw, RefreshCcw, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Poster } from '../types';
 import { useGlobalContext } from '../context/GlobalContext';
 import { RemixModal } from './RemixModal';
 import { OptimizedImage } from './ui/OptimizedImage';
+import { FormattedText } from './ui/FormattedText';
 
 interface PosterModalProps {
   poster: Poster | null;
@@ -26,6 +27,7 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
   // Zoom & Pan State
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +72,12 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
     e?.stopPropagation();
     setZoomLevel(1);
     setPanPosition({ x: 0, y: 0 });
+    setRotation(0);
+  };
+
+  const handleRotate = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setRotation(prev => (prev + 90) % 360);
   };
 
   const toggleFullscreen = (e?: React.MouseEvent) => {
@@ -142,6 +150,18 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
         detailsRef.current.scrollTop = 0;
     }
   }, [activePoster?.id]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (poster) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [poster]);
 
   // Extract colors from image
   useEffect(() => {
@@ -516,7 +536,7 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
                 >
                     <div 
                         style={{ 
-                            transform: `scale(${zoomLevel}) translate(${panPosition.x}px, ${panPosition.y}px)`,
+                            transform: `scale(${zoomLevel}) translate(${panPosition.x}px, ${panPosition.y}px) rotate(${rotation}deg)`,
                             transition: isDragging ? 'none' : 'transform 0.2s ease-out'
                         }}
                         className="relative max-w-full max-h-full flex items-center justify-center"
@@ -539,7 +559,10 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
                         <ZoomOut size={20} />
                     </button>
                     <button onClick={handleResetZoom} className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-md border border-white/10 shadow-lg transition-transform hover:scale-110" title="Reset View">
-                        <RotateCcw size={20} />
+                        <RefreshCcw size={20} />
+                    </button>
+                    <button onClick={handleRotate} className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-md border border-white/10 shadow-lg transition-transform hover:scale-110" title="Rotate">
+                        <RotateCw size={20} />
                     </button>
                     <button onClick={toggleFullscreen} className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-md border border-white/10 shadow-lg transition-transform hover:scale-110" title="Fullscreen">
                         {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
@@ -598,7 +621,7 @@ export const PosterModal: React.FC<PosterModalProps> = ({ poster, onClose, onPos
 
                     <div className="p-5 md:p-8">
                         <h2 className="text-3xl font-display font-bold text-white mb-3 uppercase tracking-wide">{activePoster.title}</h2>
-                        <p className="text-neutral-300 text-base leading-relaxed">{activePoster.description}</p>
+                        <FormattedText text={activePoster.description} className="text-neutral-300 text-base leading-relaxed" />
                         
                         <div className="flex flex-wrap gap-2 mt-6">
                             {activePoster.tags.map(tag => (

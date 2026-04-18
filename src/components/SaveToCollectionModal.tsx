@@ -17,6 +17,17 @@ export const SaveToCollectionModal: React.FC<SaveToCollectionModalProps> = ({ is
   const [newCollectionDesc, setNewCollectionDesc] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!isOpen || !user) return null;
 
   const userCollections = collections.filter(c => c.userId === user.id);

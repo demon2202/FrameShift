@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { PosterCard } from './PosterCard';
 import { Poster } from '../types';
-import { Compass, Sparkles, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Compass, Sparkles, Loader2, SearchX } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 
 interface FeedProps {
   posters: Poster[];
@@ -15,6 +15,7 @@ interface FeedProps {
 export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick, isLoading }) => {
   const [visibleCount, setVisibleCount] = useState(12);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
 
   // Reset visible count when posters array changes (e.g. filtering)
   useEffect(() => {
@@ -49,21 +50,20 @@ export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick, isLoading })
       <div className="columns-1 sm:columns-2 md:columns-3 gap-8 space-y-8">
         {[...Array(6)].map((_, i) => (
           <div key={i} className="break-inside-avoid mb-6">
-            <div className={`w-full bg-neutral-200 dark:bg-neutral-800/50 rounded-sm relative overflow-hidden ${i % 2 === 0 ? 'aspect-[3/4]' : 'aspect-square'} border border-olive-dark/5 dark:border-white/5`}>
+            <div className={`w-full bg-neutral-200 dark:bg-neutral-800/50 rounded-sm relative overflow-hidden ${i % 2 === 0 ? 'aspect-[3/4]' : 'aspect-[4/5]'} border border-olive-dark/5 dark:border-white/5`}>
                 {/* Modern shimmer effect */}
                 <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-neutral-200 dark:bg-neutral-800/50 relative overflow-hidden">
-                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
+                
+                {/* Skeleton UI Elements */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 flex flex-col gap-3 opacity-50">
+                    <div className="w-2/3 h-4 bg-white/20 rounded-full" />
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-white/20" />
+                            <div className="w-16 h-3 bg-white/20 rounded-full" />
+                        </div>
+                        <div className="w-8 h-4 bg-white/20 rounded-full" />
                     </div>
-                    <div className="w-20 h-3 rounded-full bg-neutral-200 dark:bg-neutral-800/50 relative overflow-hidden">
-                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
-                    </div>
-                </div>
-                <div className="w-8 h-3 rounded-full bg-neutral-200 dark:bg-neutral-800/50 relative overflow-hidden">
-                    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent" />
                 </div>
             </div>
           </div>
@@ -73,6 +73,31 @@ export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick, isLoading })
   }
 
   if (posters.length === 0) {
+    const isExplore = location.pathname.includes('/explore');
+    const isProfile = location.pathname.includes('/profile');
+    
+    if (isExplore || isProfile) {
+      return (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-olive-dark/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm transition-colors rounded-3xl"
+        >
+          <div className="relative mb-6">
+              <div className="w-20 h-20 bg-olive-dark/5 dark:bg-white/5 text-olive-dark/40 dark:text-cream/40 rounded-full flex items-center justify-center transition-colors">
+                  <SearchX size={32} strokeWidth={1.5} />
+              </div>
+          </div>
+          <h3 className="text-2xl font-display font-bold text-olive-dark dark:text-cream uppercase mb-2 tracking-tight transition-colors">
+              No Results Found
+          </h3>
+          <p className="text-olive-dark/60 dark:text-cream/60 font-mono text-sm max-w-md leading-relaxed transition-colors">
+              Try adjusting your search or filters to find what you're looking for.
+          </p>
+        </motion.div>
+      );
+    }
+
     return (
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -109,17 +134,16 @@ export const Feed: React.FC<FeedProps> = ({ posters, onPosterClick, isLoading })
   return (
     <>
         <div className="columns-1 sm:columns-2 md:columns-3 gap-8 space-y-8">
-          {visiblePosters.map((poster, i) => (
+          {visiblePosters.map((poster) => (
             <motion.div
                 layout
                 key={poster.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
                 viewport={{ once: true, margin: "-50px" }}
                 transition={{ 
-                    duration: 0.5,
-                    ease: "easeOut",
-                    delay: (i % 4) * 0.1 
+                    duration: 0.4,
+                    ease: "easeOut"
                 }}
                 className="break-inside-avoid mb-6"
             >

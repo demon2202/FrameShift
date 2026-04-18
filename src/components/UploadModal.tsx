@@ -24,7 +24,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<'original' | '1:1' | '4:3' | '3:4' | '16:9' | '9:16'>('original');
   const [rotation, setRotation] = useState<number>(0);
-  const [addWatermark, setAddWatermark] = useState(false);
   const [isEditingPoster, setIsEditingPoster] = useState(false);
   
   // Story State
@@ -33,8 +32,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
   const [bgColor, setBgColor] = useState('#1a1a1a');
   
   // Multi-element State
-  const [storyTexts, setStoryTexts] = useState<Array<{id: string, text: string, x: number, y: number, animation: string, color: string}>>([]);
-  const [storyEmojis, setStoryEmojis] = useState<Array<{id: string, char: string, x: number, y: number, animation: string}>>([]);
+  const [storyTexts, setStoryTexts] = useState<Array<{id: string, text: string, x: number, y: number, animation: string, color: string, scale: number, rotation: number}>>([]);
+  const [storyEmojis, setStoryEmojis] = useState<Array<{id: string, char: string, x: number, y: number, animation: string, scale: number, rotation: number}>>([]);
   const [storyOverlays, setStoryOverlays] = useState<Array<{id: string, src: string, x: number, y: number, scale: number, rotation: number}>>([]);
   
   // UI State
@@ -133,18 +132,22 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
       setIsCompressing(true);
       try {
         for (const file of Array.from(files)) {
+          if (file.size > 10 * 1024 * 1024) {
+            toast.error(`File ${file.name} is too large. Maximum size is 10MB.`);
+            continue;
+          }
           const rawBase64 = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
             reader.readAsDataURL(file);
           });
           
-          const compressed = await compressImage(rawBase64, 800, 0.7);
-          
           if (uploadModalMode === 'poster') {
-            setPosterImage(compressed);
+            const initialImage = await compressImage(rawBase64, 1600, 0.9);
+            setPosterImage(initialImage);
             setIsEditingPoster(true);
           } else {
+            const compressed = await compressImage(rawBase64, 800, 0.7);
             if (layout === 'split') {
                 setStoryImages(prev => {
                     const newImages = [...prev];
@@ -217,7 +220,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
       // Randomize position slightly to avoid overlap
       const x = 0.5 + (Math.random() * 0.2 - 0.1);
       const y = 0.5 + (Math.random() * 0.2 - 0.1);
-      const newText = { id: newId, text: 'New Text', x, y, animation: 'none', color: '#ffffff' };
+      const newText = { id: newId, text: 'New Text', x, y, animation: 'none', color: '#ffffff', scale: 1, rotation: 0 };
       setStoryTexts(prev => [...prev, newText]);
       setActiveTextId(newId);
       setCurrentInputText('New Text');
@@ -240,7 +243,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
       // Randomize position slightly
       const x = 0.5 + (Math.random() * 0.2 - 0.1);
       const y = 0.5 + (Math.random() * 0.2 - 0.1);
-      const newEmoji = { id: `e_${Date.now()}`, char, x, y, animation: 'none' };
+      const newEmoji = { id: `e_${Date.now()}`, char, x, y, animation: 'none', scale: 1, rotation: 0 };
       setStoryEmojis(prev => [...prev, newEmoji]);
   }, []);
 
@@ -248,7 +251,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
     const now = new Date();
     const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const newId = `t_${Date.now()}`;
-    const newText = { id: newId, text: timeString, x: 0.5, y: 0.5, animation: 'none', color: '#ffffff' };
+    const newText = { id: newId, text: timeString, x: 0.5, y: 0.5, animation: 'none', color: '#ffffff', scale: 1, rotation: 0 };
     setStoryTexts(prev => [...prev, newText]);
     setActiveTextId(newId);
     setCurrentInputText(timeString);
@@ -259,7 +262,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
     const now = new Date();
     const dateString = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
     const newId = `t_${Date.now()}`;
-    const newText = { id: newId, text: dateString, x: 0.5, y: 0.5, animation: 'none', color: '#ffffff' };
+    const newText = { id: newId, text: dateString, x: 0.5, y: 0.5, animation: 'none', color: '#ffffff', scale: 1, rotation: 0 };
     setStoryTexts(prev => [...prev, newText]);
     setActiveTextId(newId);
     setCurrentInputText(dateString);
@@ -270,7 +273,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
     const now = new Date();
     const dayString = now.toLocaleDateString([], { weekday: 'long' });
     const newId = `t_${Date.now()}`;
-    const newText = { id: newId, text: dayString, x: 0.5, y: 0.5, animation: 'none', color: '#ffffff' };
+    const newText = { id: newId, text: dayString, x: 0.5, y: 0.5, animation: 'none', color: '#ffffff', scale: 1, rotation: 0 };
     setStoryTexts(prev => [...prev, newText]);
     setActiveTextId(newId);
     setCurrentInputText(dayString);
@@ -415,6 +418,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
 
         // 4. Text Overlay
         storyTexts.forEach(textObj => {
+            ctx.save();
+            const x = canvas.width * textObj.x;
+            const y = canvas.height * textObj.y;
+            ctx.translate(x, y);
+            ctx.rotate((textObj.rotation * Math.PI) / 180);
+            ctx.scale(textObj.scale, textObj.scale);
+            
             ctx.fillStyle = textObj.color;
             ctx.font = "900 80px Inter, sans-serif";
             ctx.textAlign = "center";
@@ -424,20 +434,25 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 4;
 
-            const x = canvas.width * textObj.x;
-            const y = canvas.height * textObj.y;
-
-            ctx.fillText(textObj.text, x, y); 
+            ctx.fillText(textObj.text, 0, 0); 
+            ctx.restore();
         });
 
-        // 4. Emoji
+        // 5. Emoji
         storyEmojis.forEach(emojiObj => {
+            ctx.save();
+            const x = canvas.width * emojiObj.x;
+            const y = canvas.height * emojiObj.y;
+            ctx.translate(x, y);
+            ctx.rotate((emojiObj.rotation * Math.PI) / 180);
+            ctx.scale(emojiObj.scale, emojiObj.scale);
+            
             ctx.font = "150px serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            const x = canvas.width * emojiObj.x;
-            const y = canvas.height * emojiObj.y;
-            ctx.fillText(emojiObj.char, x, y);
+            
+            ctx.fillText(emojiObj.char, 0, 0);
+            ctx.restore();
         });
 
     } catch (e) {
@@ -448,81 +463,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
     return canvas.toDataURL('image/jpeg', 0.8);
   };
 
-  const processPosterImage = useCallback(async (imageSrc: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(imageSrc);
-
-        // 1. Calculate rotated dimensions
-        const isRotated = rotation % 180 !== 0;
-        const rotWidth = isRotated ? img.height : img.width;
-        const rotHeight = isRotated ? img.width : img.height;
-
-        // 2. Calculate aspect ratio crop
-        let targetWidth = rotWidth;
-        let targetHeight = rotHeight;
-
-        if (aspectRatio !== 'original') {
-            const [wRatio, hRatio] = aspectRatio.split(':').map(Number);
-            const targetRatio = wRatio / hRatio;
-            const currentRatio = rotWidth / rotHeight;
-
-            if (currentRatio > targetRatio) {
-                // Image is wider than target. Crop width.
-                targetWidth = rotHeight * targetRatio;
-            } else {
-                // Image is taller than target. Crop height.
-                targetHeight = rotWidth / targetRatio;
-            }
-        }
-
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-
-        // 3. Draw with rotation and crop
-        ctx.save();
-        // Move to center of canvas
-        ctx.translate(targetWidth / 2, targetHeight / 2);
-        // Rotate
-        ctx.rotate((rotation * Math.PI) / 180);
-        
-        // Draw image centered
-        // The source image needs to be drawn so its center aligns with the canvas center
-        // We also need to account for the crop.
-        // If we just draw the whole image centered, the canvas will clip it correctly.
-        ctx.drawImage(
-            img, 
-            -img.width / 2, 
-            -img.height / 2, 
-            img.width, 
-            img.height
-        );
-        ctx.restore();
-
-        if (addWatermark && user) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.font = 'bold 24px monospace';
-            ctx.textAlign = 'right';
-            ctx.fillText(`@${user.username || 'unknown'}`, targetWidth - 20, targetHeight - 20);
-        }
-
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
-      };
-      img.src = imageSrc;
-    });
-  }, [aspectRatio, rotation, addWatermark, user]);
+  // Removed processPosterImage as ImageEditor handles this logic entirely now
 
   useEffect(() => {
     if (posterImage) {
-        processPosterImage(posterImage).then(setPreviewImage);
+        setPreviewImage(posterImage);
     } else {
         setPreviewImage(null);
     }
-  }, [posterImage, processPosterImage]);
+  }, [posterImage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -533,7 +482,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
 
     if (uploadModalMode === 'poster') {
         if (!posterImage) return;
-        const finalImage = await processPosterImage(posterImage);
+        
+        const finalImage = posterImage;
+        
+        // Add watermark if needed (can be a simple overlay or done serverside)
+        // Since we removed processPosterImage which handled this, we'll just use the posterImage 
+        // that was output by ImageEditor
+        
         const newPoster: Poster = {
             id: `p-${Date.now()}`,
             title,
@@ -676,8 +631,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                             className={`relative w-full rounded-xl border-2 border-dashed border-white/20 hover:border-neon-lime/50 transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden bg-white/5 ${previewImage ? 'border-none' : 'aspect-[3/4]'}`}
                         >
                             {previewImage ? (
-                                <div className="relative w-full h-full group">
-                                    <OptimizedImage src={previewImage} className="w-full h-auto object-contain max-h-[600px]" containerClassName="w-full h-auto" alt="Preview" />
+                                <div className="relative w-full h-full group flex items-center justify-center">
+                                    <div style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s ease-in-out' }}>
+                                        <OptimizedImage src={previewImage} className="max-w-[100%] max-h-[600px] object-contain" containerClassName="w-full h-auto flex justify-center" alt="Preview" />
+                                    </div>
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); setIsEditingPoster(true); }}
                                         className="absolute top-4 right-4 p-3 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-neon-lime hover:text-black shadow-lg"
@@ -823,6 +780,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                                             <button 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, rotation: (o.rotation + 15) % 360 } : o));
+                                                }}
+                                                className="text-white hover:text-neon-lime"
+                                                title="Rotate"
+                                            >
+                                                <RotateCw size={12} />
+                                            </button>
+                                            <div className="w-px h-3 bg-white/20 self-center" />
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     setStoryOverlays(prev => prev.filter(o => o.id !== overlay.id));
                                                     setActiveOverlayId(null);
                                                 }}
@@ -864,7 +832,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                                         left: `${textObj.x * 100}%`, 
                                         top: `${textObj.y * 100}%`,
                                         x: '-50%',
-                                        y: '-50%'
+                                        y: '-50%',
+                                        scale: textObj.scale,
+                                        rotate: `${textObj.rotation}deg`
                                     }}
                                 >
                                     <span className="text-3xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] uppercase font-display text-center px-4 break-words max-w-full select-none">
@@ -901,23 +871,53 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                                         left: `${emojiObj.x * 100}%`, 
                                         top: `${emojiObj.y * 100}%`,
                                         x: '-50%',
-                                        y: '-50%'
+                                        y: '-50%',
+                                        scale: emojiObj.scale,
+                                        rotate: `${emojiObj.rotation}deg`
                                     }}
                                 >
                                     {emojiObj.char}
                                     
-                                    {/* Delete Button for Emoji */}
+                                    {/* Edit Controls for Emoji */}
                                     {activeEmojiId === emojiObj.id && (
-                                        <button 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setStoryEmojis(prev => prev.filter(e => e.id !== emojiObj.id));
-                                                setActiveEmojiId(null);
-                                            }}
-                                            className="absolute -top-4 -right-4 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 z-50"
-                                        >
-                                            <X size={12} />
-                                        </button>
+                                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex gap-2 bg-black/50 rounded-full px-2 py-1 z-50">
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, scale: Math.max(0.5, e.scale - 0.2) } : e));
+                                                }}
+                                                className="text-white hover:text-neon-lime text-xs font-bold"
+                                            >-</button>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, scale: Math.min(3, e.scale + 0.2) } : e));
+                                                }}
+                                                className="text-white hover:text-neon-lime text-xs font-bold"
+                                            >+</button>
+                                            <div className="w-px h-3 bg-white/20 self-center" />
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, rotation: (e.rotation + 15) % 360 } : e));
+                                                }}
+                                                className="text-white hover:text-neon-lime"
+                                                title="Rotate"
+                                            >
+                                                <RotateCw size={12} />
+                                            </button>
+                                            <div className="w-px h-3 bg-white/20 self-center" />
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setStoryEmojis(prev => prev.filter(e => e.id !== emojiObj.id));
+                                                    setActiveEmojiId(null);
+                                                }}
+                                                className="text-red-400 hover:text-red-300"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
                                     )}
                                 </motion.div>
                             ))}
@@ -1100,6 +1100,25 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                                             className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-cream focus:border-neon-lime outline-none text-sm"
                                             placeholder="Type your story..."
                                         />
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-xs text-cream/60">Size</label>
+                                            <input 
+                                                type="range"
+                                                min="0.5"
+                                                max="3"
+                                                step="0.1"
+                                                value={storyTexts.find(t => t.id === activeTextId)?.scale || 1}
+                                                onChange={(e) => setStoryTexts(prev => prev.map(t => t.id === activeTextId ? { ...t, scale: parseFloat(e.target.value) } : t))}
+                                                className="flex-1 accent-neon-lime h-1 bg-white/20 rounded-full appearance-none cursor-pointer"
+                                            />
+                                            <button 
+                                                onClick={() => setStoryTexts(prev => prev.map(t => t.id === activeTextId ? { ...t, rotation: (t.rotation + 15) % 360 } : t))}
+                                                className="p-2 border border-white/10 rounded hover:bg-white/10"
+                                                title="Rotate 15°"
+                                            >
+                                                <RotateCw size={14} />
+                                            </button>
+                                        </div>
                                         <div className="flex gap-2 flex-wrap">
                                             {['none', 'pulse', 'bounce', 'spin', 'wiggle', 'float'].map(anim => (
                                                 <button 
@@ -1160,57 +1179,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                                         type="text" 
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
+                                        maxLength={100}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none font-medium"
                                         placeholder="e.g. Neon Dreams"
                                     />
                                 </div>
                                 
-                                <div className="flex flex-col gap-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-cream/60 uppercase tracking-widest block mb-2">Aspect Ratio</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {['original', '1:1', '4:3', '3:4', '16:9', '9:16'].map(ratio => (
-                                                <button 
-                                                    key={ratio}
-                                                    onClick={() => setAspectRatio(ratio as any)}
-                                                    className={`py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors ${aspectRatio === ratio ? 'bg-neon-lime text-olive-dark' : 'bg-white/5 text-cream/60 hover:bg-white/10'}`}
-                                                >
-                                                    {ratio}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-cream/60 uppercase tracking-widest block mb-2">Rotation</label>
-                                        <button 
-                                            onClick={() => setRotation(r => (r + 90) % 360)}
-                                            className="w-full py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors bg-white/5 text-cream hover:bg-white/10 flex items-center justify-center gap-2"
-                                        >
-                                            <RotateCw size={16} /> Rotate 90°
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <div className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${addWatermark ? 'bg-neon-lime border-neon-lime text-olive-dark' : 'border-white/20 bg-white/5'}`}>
-                                            {addWatermark && <Check size={14} strokeWidth={3} />}
-                                        </div>
-                                        <span className="text-sm font-bold text-cream/80 uppercase tracking-widest">Add Watermark (@{user?.username})</span>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={addWatermark} 
-                                            onChange={(e) => setAddWatermark(e.target.checked)} 
-                                            className="hidden" 
-                                        />
-                                    </label>
-                                </div>
-
                                 <div>
                                     <label className="text-xs font-bold text-cream/60 uppercase tracking-widest block mb-2">Description</label>
                                     <textarea 
                                         value={desc}
                                         onChange={(e) => setDesc(e.target.value)}
+                                        maxLength={500}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none resize-none h-24 font-medium"
                                         placeholder="Tell us about your artwork..."
                                     />
@@ -1221,6 +1201,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                                         type="text" 
                                         value={tags}
                                         onChange={(e) => setTags(e.target.value)}
+                                        maxLength={100}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none font-medium"
                                         placeholder="cyberpunk, 3d, abstract"
                                     />

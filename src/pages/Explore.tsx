@@ -4,7 +4,7 @@ import { Feed } from '../components/Feed';
 import { Poster } from '../types';
 import { PosterModal } from '../components/PosterModal';
 import { useGlobalContext } from '../context/GlobalContext';
-import { X, Filter, ArrowUpRight, Zap, Layers, Sparkles, Heart, Check, Plus } from 'lucide-react';
+import { X, Filter, ArrowUpRight, Zap, Layers, Sparkles, Check, Plus } from 'lucide-react';
 import { ContourBackground } from '../components/ui/ContourBackground';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -17,8 +17,8 @@ export const Explore: React.FC = () => {
   const [selectedPoster, setSelectedPoster] = useState<Poster | null>(null);
   const [activeInfoModal, setActiveInfoModal] = useState<InfoType | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'recommended' | 'latest' | 'trending'>('recommended');
-  const [hoveredCardIndex, setHoveredCardIndex] = useState<number | null>(null);
   const { posters, likedPosters, savedPosters, user, toggleFollow, isFollowing, isDataLoading } = useGlobalContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -89,6 +89,16 @@ export const Explore: React.FC = () => {
   const filteredPosters = useMemo(() => {
     let result = sortedPosters;
     
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p => 
+        p.title.toLowerCase().includes(q) || 
+        p.tags.some(t => t.toLowerCase().includes(q)) ||
+        p.creator?.username.toLowerCase().includes(q) ||
+        p.creator?.name.toLowerCase().includes(q)
+      );
+    }
+
     if (activeTag) {
         const term = activeTag.toLowerCase();
         result = result.filter(p =>
@@ -108,7 +118,7 @@ export const Explore: React.FC = () => {
     }
     
     return result;
-  }, [sortedPosters, activeTag, sortBy]);
+  }, [sortedPosters, activeTag, sortBy, searchQuery]);
 
   const categories = useMemo(() => {
     const tagCounts: Record<string, number> = {};
@@ -220,7 +230,7 @@ export const Explore: React.FC = () => {
                 hidden: { opacity: 0 },
                 visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
               }}
-              className="text-[14vw] md:text-[8vw] lg:text-[9vw] leading-[0.85] font-display font-black text-olive-dark dark:text-cream uppercase tracking-tighter flex flex-col"
+              className="text-[12vw] sm:text-[10vw] md:text-[8vw] lg:text-[9vw] leading-[0.85] font-display font-black text-olive-dark dark:text-cream uppercase tracking-tighter flex flex-col"
             >
               <div className="flex overflow-hidden">
                 {"Explore".split('').map((char, index) => (
@@ -333,15 +343,19 @@ export const Explore: React.FC = () => {
             </motion.div>
 
             {/* Decorative Circle */}
-            <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] md:w-[400px] md:h-[400px] border border-dashed border-olive-dark/20 dark:border-white/20 rounded-full z-0 pointer-events-none"
-            />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] md:w-[400px] md:h-[400px] z-0 pointer-events-none">
+                <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                    className="w-full h-full border border-dashed border-olive-dark/20 dark:border-white/20 rounded-full"
+                />
+            </div>
         </div>
       </section>
 
-      {/* 2. TRENDING (FANNED CARDS) */}
+
+
+      {/* 2. TRENDING CREATORS SPOTLIGHT */}
       <section id="trending-section" className="py-16 md:py-32 relative z-10 bg-cream dark:bg-neutral-900 border-t-2 border-olive-dark dark:border-cream transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 md:px-8 mb-12 md:mb-24 flex flex-col md:flex-row items-start md:items-end justify-between gap-8">
           <div className="flex flex-col">
@@ -373,149 +387,89 @@ export const Explore: React.FC = () => {
           </div>
         </div>
 
-        {/* Desktop Fanned Cards */}
-        <div 
-          className="hidden md:flex justify-center items-center h-[500px] relative perspective-1000 overflow-hidden"
-          onMouseLeave={() => setHoveredCardIndex(null)}
-        >
-          {dailyTrendingPosters.slice(0, 5).map((poster, index) => {
-            const rotation = (index - 2) * 12;
-            const yOffset = Math.abs(index - 2) * 25;
-            const isHovered = hoveredCardIndex === index;
-            const baseZIndex = 5 - Math.abs(index - 2);
+        {/* Creator Spotlight Carousel */}
+        <div className="w-full relative mt-8">
+          <div className="flex overflow-x-auto gap-6 px-4 md:px-8 pb-12 pt-4 snap-x snap-mandatory no-scrollbar touch-pan-x">
+            {realUsers.slice(0, 5).map((creator, index) => {
+              const creatorPosters = posters.filter(p => p.creatorId === creator.id).slice(0, 3);
+              const isMe = user?.id === creator.id;
+              const isFollowingUser = isFollowing(creator.id);
+              const showTick = isMe || isFollowingUser;
 
-            return (
-              <motion.div
-                key={poster.id}
-                initial={{ rotate: 0, y: 150, opacity: 0 }}
-                whileInView={{ rotate: rotation, y: yOffset, opacity: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.8, delay: index * 0.1, type: "spring", bounce: 0.4 }}
-                onMouseEnter={() => setHoveredCardIndex(index)}
-                className="absolute w-72 lg:w-80 aspect-[3/4] cursor-pointer origin-bottom group"
-                style={{
-                  left: `calc(50% - 144px + ${(index - 2) * 70}px)`,
-                  zIndex: isHovered ? 50 : baseZIndex,
-                }}
-              >
-                <motion.div
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 4 + index, repeat: Infinity, ease: "easeInOut" }}
-                    whileHover={{ scale: 1.05, y: -20, transition: { duration: 0.3 } }}
-                    onClick={() => setSelectedPoster(poster)}
-                    className="w-full h-full rounded-2xl overflow-hidden shadow-2xl border-4 border-white dark:border-neutral-800 relative"
-                    style={{ willChange: "transform" }}
+              return (
+                <motion.div 
+                  key={creator.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ delay: index * 0.1, duration: 0.5 }}
+                  className="min-w-[85vw] sm:min-w-[400px] md:min-w-[450px] snap-center bg-white dark:bg-neutral-800 rounded-3xl p-6 shadow-xl border border-olive-dark/10 dark:border-white/10 flex flex-col gap-6"
                 >
-                    <OptimizedImage
-                      src={poster.imageUrl}
-                      alt={poster.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      containerClassName="w-full h-full"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6" style={{ willChange: 'opacity' }}>
-                      <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300 will-change-transform">
-                        <h3 className="text-white font-display font-bold text-2xl uppercase leading-tight mb-1">
-                          {poster.title}
-                        </h3>
-                        <div className="flex items-center justify-between">
-                          <p className="text-neon-lime font-mono text-xs uppercase">
-                            @{poster.creator?.username || 'unknown'}
-                          </p>
-                          <div className="flex items-center gap-1 text-white/80 text-xs font-mono">
-                            <Heart size={12} className="fill-current" /> {poster.likes}
-                          </div>
+                  {/* Creator Header */}
+                  <div className="flex items-center justify-between">
+                    <div 
+                      className="flex items-center gap-4 cursor-pointer group"
+                      onClick={() => navigate(`/profile/${creator.id}`)}
+                    >
+                      <OptimizedImage 
+                        src={creator.avatar} 
+                        alt={creator.username} 
+                        className="w-16 h-16 rounded-full object-cover border-2 border-neon-lime group-hover:scale-105 transition-transform"
+                        containerClassName="w-16 h-16 rounded-full shrink-0"
+                      />
+                      <div>
+                        <h3 className="font-display font-bold text-xl uppercase leading-tight group-hover:text-neon-lime transition-colors">{creator.name}</h3>
+                        <p className="font-mono text-xs text-olive-dark/60 dark:text-cream/60">@{creator.username}</p>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (user) {
+                          if (!isMe) toggleFollow(creator.id);
+                        } else {
+                          navigate('/login');
+                        }
+                      }}
+                      className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${
+                        showTick
+                          ? 'bg-olive-dark/10 dark:bg-white/10 text-olive-dark dark:text-white hover:bg-red-500/20 hover:text-red-500'
+                          : 'bg-neon-lime text-olive-dark hover:bg-olive-dark hover:text-neon-lime'
+                      }`}
+                    >
+                      {showTick ? <Check size={14} className="inline mr-1" /> : <Plus size={14} className="inline mr-1" />}
+                      {showTick ? 'Following' : 'Follow'}
+                    </button>
+                  </div>
+
+                  {/* Mini Grid of Posters */}
+                  <div className="grid grid-cols-3 gap-2 flex-1">
+                    {creatorPosters.map((p, i) => (
+                      <div 
+                        key={p.id} 
+                        className={`rounded-xl overflow-hidden cursor-pointer relative group ${i === 0 ? 'col-span-2 row-span-2 aspect-square' : 'col-span-1 aspect-square'}`}
+                        onClick={() => setSelectedPoster(p)}
+                      >
+                        <OptimizedImage 
+                          src={p.imageUrl} 
+                          alt={p.title} 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          containerClassName="w-full h-full"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <ArrowUpRight className="text-neon-lime" size={24} />
                         </div>
                       </div>
-                    </div>
+                    ))}
+                    {/* Fill empty spots if less than 3 posters */}
+                    {Array.from({ length: Math.max(0, 3 - creatorPosters.length) }).map((_, i) => (
+                      <div key={`empty-${i}`} className="bg-olive-dark/5 dark:bg-white/5 rounded-xl aspect-square" />
+                    ))}
+                  </div>
                 </motion.div>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Mobile Horizontal Scroll (Improved) */}
-        <div className="md:hidden w-full relative mt-8">
-          {/* Fade edges */}
-          <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-cream dark:from-neutral-900 to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-cream dark:from-neutral-900 to-transparent z-10 pointer-events-none" />
-          
-          <div 
-            className="flex overflow-x-auto gap-4 px-6 pb-12 pt-4 snap-x snap-mandatory no-scrollbar touch-pan-x select-none"
-            onMouseDown={(e) => {
-              const ele = e.currentTarget;
-              ele.style.cursor = 'grabbing';
-              ele.style.userSelect = 'none';
-              
-              const pos = { left: ele.scrollLeft, x: e.clientX };
-              
-              const mouseMoveHandler = (e: MouseEvent) => {
-                const dx = e.clientX - pos.x;
-                if (Math.abs(dx) > 5) {
-                  ele.setAttribute('data-dragged', 'true');
-                }
-                ele.scrollLeft = pos.left - dx;
-              };
-              
-              const mouseUpHandler = () => {
-                ele.style.cursor = 'grab';
-                ele.style.removeProperty('user-select');
-                document.removeEventListener('mousemove', mouseMoveHandler);
-                document.removeEventListener('mouseup', mouseUpHandler);
-                // Reset data-dragged after a short delay so click capture can catch it
-                setTimeout(() => {
-                  ele.removeAttribute('data-dragged');
-                }, 50);
-              };
-              
-              document.addEventListener('mousemove', mouseMoveHandler);
-              document.addEventListener('mouseup', mouseUpHandler);
-            }}
-            onClickCapture={(e) => {
-              // If we want to prevent click after drag, we can check a data attribute
-              if (e.currentTarget.getAttribute('data-dragged') === 'true') {
-                e.stopPropagation();
-                e.preventDefault();
-                e.currentTarget.setAttribute('data-dragged', 'false');
-              }
-            }}
-            style={{ cursor: 'grab' }}
-          >
-            {dailyTrendingPosters.slice(0, 5).map((poster, i) => (
-              <motion.div 
-                key={poster.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ delay: i * 0.1, duration: 0.5 }}
-                className="min-w-[75vw] sm:min-w-[50vw] aspect-[4/5] snap-center relative group cursor-pointer"
-              >
-                <div
-                    onClick={() => setSelectedPoster(poster)}
-                    className="w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-olive-dark/10 dark:border-white/10 relative transition-transform duration-300 active:scale-95"
-                >
-                    <OptimizedImage
-                      src={poster.imageUrl}
-                      alt={poster.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      containerClassName="w-full h-full"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-5">
-                      <div className="flex items-center gap-2 mb-2">
-                        <OptimizedImage src={poster.creator?.avatar} alt={poster.creator?.username || 'unknown'} className="w-6 h-6 rounded-full border border-white/20" containerClassName="w-6 h-6 rounded-full" />
-                        <p className="text-neon-lime font-mono text-[10px] uppercase">
-                          @{poster.creator?.username || 'unknown'}
-                        </p>
-                      </div>
-                      <h3 className="text-white font-display font-bold text-xl uppercase leading-tight mb-2">
-                        {poster.title}
-                      </h3>
-                      <div className="flex items-center gap-3 text-white/70 text-[10px] font-mono">
-                        <span className="flex items-center gap-1"><Heart size={10} className="fill-current" /> {poster.likes}</span>
-                      </div>
-                    </div>
-                </div>
-              </motion.div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -690,12 +644,26 @@ export const Explore: React.FC = () => {
               </div>
             </div>
 
+            {/* Search Bar */}
+            <div className="relative w-full md:w-1/3 min-w-[300px] flex-1 max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="w-5 h-5 text-olive-dark/50 dark:text-cream/50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </div>
+                <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search creators, titles, or tags..." 
+                    className="w-full pl-12 pr-4 py-3 bg-white dark:bg-black border border-olive-dark/20 dark:border-white/20 rounded-full focus:outline-none focus:border-neon-lime focus:ring-1 focus:ring-neon-lime text-sm font-mono text-olive-dark dark:text-cream placeholder-olive-dark/40 dark:placeholder-cream/40 transition-all shadow-sm"
+                />
+            </div>
+
             {/* Sort Controls */}
             <div className="flex items-center gap-4 self-start md:self-auto">
               <div className="flex items-center gap-1 bg-white/50 dark:bg-black/50 backdrop-blur-sm rounded-2xl p-1.5 border border-olive-dark/10 dark:border-white/10">
                 <button
                   onClick={() => setSortBy('recommended')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all ${
                     sortBy === 'recommended' ? 'bg-olive-dark text-neon-lime shadow-md dark:bg-cream dark:text-olive-dark' : 'text-olive-dark/60 dark:text-cream/60 hover:text-olive-dark dark:hover:text-cream'
                   }`}
                 >
@@ -703,7 +671,7 @@ export const Explore: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setSortBy('latest')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all ${
                     sortBy === 'latest' ? 'bg-olive-dark text-white shadow-md dark:bg-cream dark:text-olive-dark' : 'text-olive-dark/60 dark:text-cream/60 hover:text-olive-dark dark:hover:text-cream'
                   }`}
                 >
@@ -711,7 +679,7 @@ export const Explore: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setSortBy('trending')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all ${
                     sortBy === 'trending' ? 'bg-neon-lime text-olive-dark shadow-md dark:bg-cream dark:text-olive-dark' : 'text-olive-dark/60 dark:text-cream/60 hover:text-olive-dark dark:hover:text-cream'
                   }`}
                 >
@@ -765,7 +733,7 @@ export const Explore: React.FC = () => {
                 <button
                   key={tag}
                   onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-                  className={`shrink-0 snap-start px-5 py-2.5 rounded-2xl border transition-all duration-300 text-xs font-bold uppercase tracking-wider cursor-pointer ${
+                  className={`shrink-0 snap-start px-3 py-1.5 md:px-5 md:py-2.5 rounded-2xl border transition-all duration-300 text-[10px] md:text-xs font-bold uppercase tracking-wider cursor-pointer ${
                     activeTag === tag
                       ? 'bg-olive-dark text-neon-lime border-olive-dark shadow-lg shadow-olive-dark/20 dark:bg-cream dark:text-olive-dark dark:border-cream'
                       : 'bg-white/50 dark:bg-black/50 backdrop-blur-sm border-olive-dark/20 text-olive-dark hover:border-olive-dark hover:bg-olive-dark/5 dark:border-cream/20 dark:text-cream dark:hover:border-cream dark:hover:bg-cream/5'

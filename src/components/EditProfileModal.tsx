@@ -5,6 +5,7 @@ import { X, Camera, Loader2 } from 'lucide-react';
 import { useGlobalContext } from '../context/GlobalContext';
 import { OptimizedImage } from './ui/OptimizedImage';
 import { ImageEditor } from './ImageEditor';
+import toast from 'react-hot-toast';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -41,11 +42,26 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
             setAvatar(user.avatar);
             setBanner(user.bannerUrl || 'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?auto=format&fit=crop&w=1500&q=80');
         }
+        
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
     }, [user, isOpen]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
         const file = e.target.files?.[0];
         if (file) {
+            if (file.size > 10 * 1024 * 1024) {
+                toast.error('File is too large. Maximum size is 10MB.');
+                e.target.value = '';
+                return;
+            }
             const reader = new FileReader();
             reader.onloadend = () => {
                 setEditingImage({
@@ -160,6 +176,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                                             type="text" 
                                             value={username}
                                             onChange={(e) => setUsername(e.target.value)}
+                                            maxLength={30}
                                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none font-medium"
                                             placeholder="username"
                                             required
@@ -171,6 +188,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                                             type="text" 
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
+                                            maxLength={50}
                                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none font-medium"
                                             placeholder="Your Name"
                                             required
@@ -182,6 +200,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                                         <textarea 
                                             value={bio}
                                             onChange={(e) => setBio(e.target.value)}
+                                            maxLength={160}
                                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none resize-none h-24 font-medium"
                                             placeholder="Tell the world about yourself..."
                                         />
@@ -193,6 +212,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                                             type="url" 
                                             value={website}
                                             onChange={(e) => setWebsite(e.target.value)}
+                                            maxLength={100}
                                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none font-medium"
                                             placeholder="https://yourwebsite.com"
                                         />
@@ -204,6 +224,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                                             type="text" 
                                             value={location}
                                             onChange={(e) => setLocation(e.target.value)}
+                                            maxLength={50}
                                             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none font-medium"
                                             placeholder="City, Country"
                                         />

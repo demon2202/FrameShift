@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useMemo } from 'react';
 import { User, Poster, Follow, Message, Story, Like, Saved, Notification, Comment, Challenge, ChallengeEntry, Thread, Collection } from '../types';
 import { db, auth, googleProvider } from '../firebase';
-import { collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, arrayUnion, arrayRemove, writeBatch, addDoc, increment } from 'firebase/firestore';
-import { signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, arrayUnion, arrayRemove, writeBatch, addDoc, increment, limit } from 'firebase/firestore';
+import { signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword as updateFirebasePassword, deleteUser } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
 enum OperationType {
@@ -81,7 +81,7 @@ interface GlobalContextType {
   getLikeCount: (posterId: string) => number;
   toggleSave: (posterId: string) => void;
   isSaved: (posterId: string) => boolean;
-  sendMessage: (threadId: string, text: string, posterId?: string, imageUrl?: string) => Promise<{ success: boolean; error?: string }>;
+  sendMessage: (threadId: string, text: string, posterId?: string, imageUrl?: string, audioUrl?: string, replyToId?: string) => Promise<{ success: boolean; error?: string }>;
   deleteMessage: (threadId: string, messageId: string) => Promise<void>;
   addStory: (imageUrl: string) => Promise<void>;
   deleteStory: (storyId: string) => void;
@@ -219,7 +219,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Global Listeners
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(500)), (snapshot) => {
       const usersData = snapshot.docs.map(doc => doc.data() as User);
       setAllUsers(usersData);
       setUser(prevUser => {
@@ -229,7 +229,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
 
-    const unsubPosters = onSnapshot(collection(db, 'posters'), (snapshot) => {
+    const unsubPosters = onSnapshot(query(collection(db, 'posters'), orderBy('createdAt', 'desc'), limit(150)), (snapshot) => {
       setPosters(snapshot.docs.map(doc => doc.data() as Poster));
       setIsDataLoading(false);
     }, (error) => {
@@ -237,19 +237,19 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setIsDataLoading(false);
     });
 
-    const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
+    const unsubComments = onSnapshot(query(collection(db, 'comments'), orderBy('createdAt', 'desc'), limit(500)), (snapshot) => {
       setComments(snapshot.docs.map(doc => doc.data() as Comment));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'comments'));
 
-    const unsubLikes = onSnapshot(collection(db, 'likes'), (snapshot) => {
+    const unsubLikes = onSnapshot(query(collection(db, 'likes'), limit(1000)), (snapshot) => {
       setLikes(snapshot.docs.map(doc => doc.data() as Like));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'likes'));
 
-    const unsubFollows = onSnapshot(collection(db, 'follows'), (snapshot) => {
+    const unsubFollows = onSnapshot(query(collection(db, 'follows'), limit(1000)), (snapshot) => {
       setFollows(snapshot.docs.map(doc => doc.data() as Follow));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'follows'));
 
-    const unsubStories = onSnapshot(collection(db, 'stories'), (snapshot) => {
+    const unsubStories = onSnapshot(query(collection(db, 'stories'), orderBy('timestamp', 'desc'), limit(100)), (snapshot) => {
       setStories(snapshot.docs.map(doc => doc.data() as Story));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'stories'));
 
@@ -1043,7 +1043,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return newThreadRef.id;
   };
 
-  const sendMessage = async (threadId: string, text: string, posterId?: string, imageUrl?: string) => {
+  const sendMessage = async (threadId: string, text: string, posterId?: string, imageUrl?: string, audioUrl?: string, replyToId?: string) => {
     if (!user) return { success: false, error: 'Not logged in' };
     
     const thread = threads.find(t => t.id === threadId);
@@ -1085,6 +1085,8 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       };
       if (posterId) msgData.posterId = posterId;
       if (imageUrl) msgData.imageUrl = imageUrl;
+      if (audioUrl) msgData.audioUrl = audioUrl;
+      if (replyToId) msgData.replyToId = replyToId;
 
       await setDoc(msgRef, msgData);
 
@@ -1243,7 +1245,16 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const updatePassword = async () => {};
+  const updatePassword = async (newPass: string) => {
+    if (!auth.currentUser) throw new Error("No authenticated user");
+    try {
+      await updateFirebasePassword(auth.currentUser, newPass);
+    } catch (error) {
+      console.error("Failed to update password", error);
+      throw error;
+    }
+  };
+
   const togglePrivacy = async () => {
     if (!user) return;
     try {
@@ -1254,7 +1265,20 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.id}`);
     }
   };
-  const deleteAccount = () => {};
+
+  const deleteAccount = async () => {
+    if (!user || !auth.currentUser) return;
+    try {
+      // Typically you'd also delete the user document and their posts.
+      // For now, we'll just delete the user document and auth user.
+      await deleteDoc(doc(db, 'users', user.id));
+      await deleteUser(auth.currentUser);
+      logout();
+    } catch (error) {
+      console.error("Failed to delete account", error);
+      throw error;
+    }
+  };
   const blockUser = async (userId: string) => {
     if (!user) return;
     try {

@@ -73,6 +73,17 @@ const content: Record<InfoType, { title: string; body: React.ReactNode }> = {
 };
 
 export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, type }) => {
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!type) return null;
 
   return (

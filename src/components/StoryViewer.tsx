@@ -25,6 +25,13 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({ groupedStories, initia
   const currentStory = currentUserGroup?.stories[currentStoryIndex];
   const isOwnStory = user && currentUserGroup ? user.id === currentUserGroup.user.id : false;
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const handleNext = useCallback(() => {
     if (currentStoryIndex < currentUserGroup.stories.length - 1) {
       setCurrentStoryIndex(prev => prev + 1);

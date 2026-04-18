@@ -18,6 +18,14 @@ export interface User {
   website?: string;
   location?: string;
   onboarded?: boolean;
+  notificationPreferences?: {
+    email: boolean;
+    push: boolean;
+    inApp?: boolean;
+    likesAndComments?: boolean;
+    newFollowers?: boolean;
+    directMessages?: boolean;
+  };
 }
 
 export interface Challenge {
@@ -94,6 +102,8 @@ export interface Message {
   read: boolean;
   posterId?: string;
   imageUrl?: string;
+  audioUrl?: string;
+  replyToId?: string;
 }
 
 export interface Story {
@@ -125,6 +135,10 @@ export interface ThreadMessage {
   timestamp: string;
   isMe: boolean;
   posterId?: string;
+  imageUrl?: string;
+  audioUrl?: string;
+  replyToId?: string;
+  read?: boolean;
 }
 
 export interface Thread {

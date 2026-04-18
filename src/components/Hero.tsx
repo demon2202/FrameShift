@@ -86,7 +86,7 @@ export const Hero: React.FC = () => {
                         hidden: { opacity: 0 },
                         visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
                     }}
-                    className="text-[18vw] leading-[0.8] font-display font-black uppercase tracking-tighter text-cream flex overflow-hidden"
+                    className="text-[15vw] md:text-[18vw] leading-[0.8] font-display font-black uppercase tracking-tighter text-cream flex overflow-hidden"
                 >
                     {"Frame".split('').map((char, index) => (
                         <motion.span
@@ -110,7 +110,7 @@ export const Hero: React.FC = () => {
                     }}
                     className="flex items-center gap-4 md:gap-12"
                 >
-                    <h1 className="text-[18vw] leading-[0.8] font-display font-black uppercase tracking-tighter text-neon-lime flex overflow-hidden">
+                    <h1 className="text-[15vw] md:text-[18vw] leading-[0.8] font-display font-black uppercase tracking-tighter text-neon-lime flex overflow-hidden">
                         {"Shift".split('').map((char, index) => (
                             <motion.span
                                 key={index}
@@ -195,7 +195,7 @@ export const Hero: React.FC = () => {
                                 <p className="font-mono text-xs text-neon-lime uppercase tracking-widest">@{poster.creator?.username || 'unknown'}</p>
                             </div>
                         </div>
-                        <h2 className="text-6xl md:text-8xl font-display font-black text-cream uppercase leading-[0.85] tracking-tighter mb-6">
+                        <h2 className="text-4xl sm:text-6xl md:text-8xl font-display font-black text-cream uppercase leading-[0.85] tracking-tighter mb-4 sm:mb-6">
                             {poster.title}
                         </h2>
                         <p className="text-cream/60 font-serif italic text-2xl max-w-md">

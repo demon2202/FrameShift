@@ -40,7 +40,13 @@ export const RemixModal: React.FC<RemixModalProps> = ({ isOpen, onClose, origina
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedFilter(FILTERS[0]);
         setTitle(`Remix of ${originalPoster.title}`);
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = 'unset';
     }
+    return () => {
+        document.body.style.overflow = 'unset';
+    };
   }, [isOpen, originalPoster]);
 
   const handleSave = async () => {

@@ -37,7 +37,7 @@ const BlockedUserItem: React.FC<{ userId: string }> = ({ userId }) => {
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { user, updatePassword, togglePrivacy, deleteAccount, theme, toggleTheme, updateFeedPreferences } = useGlobalContext();
+  const { user, updatePassword, togglePrivacy, deleteAccount, theme, toggleTheme, updateFeedPreferences, updateUserProfile } = useGlobalContext();
   const [activeTab, setActiveTab] = useState<'account' | 'privacy' | 'notifications' | 'appearance' | 'feed'>('account');
   
   // Password State
@@ -45,9 +45,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+  // Profile State
+  const [username, setUsername] = useState(user?.username || '');
+  const [name, setName] = useState(user?.name || '');
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
   // Mock States
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [pushNotifs, setPushNotifs] = useState(true);
+  // const [emailNotifs, setEmailNotifs] = useState(true);
+  // const [pushNotifs, setPushNotifs] = useState(true);
+  
+  const notifs = {
+      email: user?.notificationPreferences?.email ?? true,
+      push: user?.notificationPreferences?.push ?? true,
+      likesAndComments: user?.notificationPreferences?.likesAndComments ?? true,
+      newFollowers: user?.notificationPreferences?.newFollowers ?? true,
+      directMessages: user?.notificationPreferences?.directMessages ?? true,
+  };
+
+  const handleToggleNotification = async (key: keyof typeof notifs) => {
+      if (!user) return;
+      await updateUserProfile({
+          notificationPreferences: {
+              ...(user.notificationPreferences || { email: true, push: true }),
+              [key]: !notifs[key]
+          }
+      });
+  };
+
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   const [localFeedPrefs, setLocalFeedPrefs] = useState<string[]>(user?.feedPreferences || []);
 
@@ -59,19 +93,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword !== confirmPassword) {
-        setMessage({ type: 'error', text: "Passwords don't match" });
+    try {
+        if (newPassword !== confirmPassword) {
+            setMessage({ type: 'error', text: "Passwords don't match" });
+            return;
+        }
+        if (newPassword.length < 6) {
+            setMessage({ type: 'error', text: "Password must be at least 6 characters" });
+            return;
+        }
+        
+        await updatePassword(newPassword);
+        setMessage({ type: 'success', text: "Password updated successfully" });
+        setNewPassword('');
+        setConfirmPassword('');
+    } catch (error: any) {
+        setMessage({ type: 'error', text: error.message || "Failed to update password" });
+    }
+  };
+
+  const handleProfileChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !name.trim()) {
+        setProfileMessage({ type: 'error', text: "Name and Username are required" });
         return;
     }
-    if (newPassword.length < 6) {
-        setMessage({ type: 'error', text: "Password must be at least 6 characters" });
-        return;
+    try {
+        await updateUserProfile({
+            username: username.trim(),
+            name: name.trim()
+        });
+        setProfileMessage({ type: 'success', text: "Profile updated successfully" });
+    } catch (error: any) {
+        setProfileMessage({ type: 'error', text: error.message || "Failed to update profile" });
     }
-    
-    await updatePassword(newPassword);
-    setMessage({ type: 'success', text: "Password updated successfully" });
-    setNewPassword('');
-    setConfirmPassword('');
   };
 
   if (!isOpen || !user) return null;
@@ -176,8 +231,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             )}
 
             {activeTab === 'account' && (
-                <div className="space-y-6 max-w-lg">
+                <div className="space-y-8 max-w-lg">
                     <div>
+                        <h3 className="text-xl font-bold text-olive-dark dark:text-cream uppercase tracking-tight mb-2">Profile Info</h3>
+                        <p className="text-sm text-olive-dark/60 dark:text-cream/60">Update your public display name and username.</p>
+                    </div>
+
+                    <form onSubmit={handleProfileChange} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-olive-dark dark:text-cream uppercase tracking-widest mb-2">Display Name</label>
+                            <input 
+                                type="text" 
+                                value={name}
+                                onChange={(e) => { setProfileMessage(null); setName(e.target.value); }}
+                                className="w-full bg-cream dark:bg-white/5 border border-olive-dark/10 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-olive-dark/30 dark:focus:border-white/30 text-olive-dark dark:text-cream transition-colors"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-olive-dark dark:text-cream uppercase tracking-widest mb-2">Username</label>
+                            <input 
+                                type="text" 
+                                value={username}
+                                onChange={(e) => { setProfileMessage(null); setUsername(e.target.value); }}
+                                className="w-full bg-cream dark:bg-white/5 border border-olive-dark/10 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-olive-dark/30 dark:focus:border-white/30 text-olive-dark dark:text-cream transition-colors"
+                            />
+                        </div>
+
+                        {profileMessage && (
+                            <div className={`text-xs font-bold uppercase tracking-wide p-3 rounded-lg ${profileMessage.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {profileMessage.text}
+                            </div>
+                        )}
+
+                        <button 
+                            type="submit"
+                            className="px-8 py-3 bg-olive-dark text-neon-lime font-bold text-xs uppercase tracking-widest rounded-full hover:bg-olive-dark/90 transition-all shadow-lg"
+                        >
+                            Update Profile
+                        </button>
+                    </form>
+
+                    <div className="pt-8 mt-8 border-t border-olive-dark/10 dark:border-white/10">
                         <h3 className="text-xl font-bold text-olive-dark dark:text-cream uppercase tracking-tight mb-2">Change Password</h3>
                         <p className="text-sm text-olive-dark/60 dark:text-cream/60">Update your password to keep your account secure.</p>
                     </div>
@@ -288,31 +382,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     </div>
 
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-cream dark:bg-white/5 rounded-xl border border-olive-dark/10 dark:border-white/10">
-                            <div>
-                                <h4 className="font-bold text-olive-dark dark:text-cream uppercase tracking-wide text-sm">Email Notifications</h4>
-                                <p className="text-xs text-olive-dark/60 dark:text-cream/60 mt-1">Receive emails about your account activity.</p>
+                        {[
+                            { id: 'email', label: 'Email Notifications', desc: 'Receive emails about your account activity.' },
+                            { id: 'push', label: 'Push Notifications', desc: 'Receive push notifications on your device.' },
+                            { id: 'likesAndComments', label: 'Likes & Comments', desc: 'When someone interacts with your posters.' },
+                            { id: 'newFollowers', label: 'New Followers', desc: 'When someone starts following you.' },
+                            { id: 'directMessages', label: 'Direct Messages', desc: 'When you receive a new message.' },
+                        ].map((item) => (
+                            <div key={item.id} className="flex items-center justify-between p-4 bg-cream dark:bg-white/5 rounded-xl border border-olive-dark/10 dark:border-white/10 hover:border-olive-dark/30 dark:hover:border-white/30 transition-colors">
+                                <div>
+                                    <h4 className="font-bold text-olive-dark dark:text-cream uppercase tracking-wide text-sm">{item.label}</h4>
+                                    <p className="text-xs text-olive-dark/60 dark:text-cream/60 mt-1">{item.desc}</p>
+                                </div>
+                                <button 
+                                    onClick={() => handleToggleNotification(item.id as keyof typeof notifs)}
+                                    className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${notifs[item.id as keyof typeof notifs] ? 'bg-olive-dark dark:bg-neon-lime' : 'bg-olive-dark/20 dark:bg-white/20'}`}
+                                >
+                                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white dark:bg-olive-dark rounded-full shadow-sm transition-transform duration-300 ${notifs[item.id as keyof typeof notifs] ? 'translate-x-6' : 'translate-x-0'}`} />
+                                </button>
                             </div>
-                            <button 
-                                onClick={() => setEmailNotifs(!emailNotifs)}
-                                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${emailNotifs ? 'bg-olive-dark dark:bg-neon-lime' : 'bg-olive-dark/20 dark:bg-white/20'}`}
-                            >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white dark:bg-olive-dark rounded-full shadow-sm transition-transform duration-300 ${emailNotifs ? 'translate-x-6' : 'translate-x-0'}`} />
-                            </button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-cream dark:bg-white/5 rounded-xl border border-olive-dark/10 dark:border-white/10">
-                            <div>
-                                <h4 className="font-bold text-olive-dark dark:text-cream uppercase tracking-wide text-sm">Push Notifications</h4>
-                                <p className="text-xs text-olive-dark/60 dark:text-cream/60 mt-1">Receive push notifications on your device.</p>
-                            </div>
-                            <button 
-                                onClick={() => setPushNotifs(!pushNotifs)}
-                                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${pushNotifs ? 'bg-olive-dark dark:bg-neon-lime' : 'bg-olive-dark/20 dark:bg-white/20'}`}
-                            >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white dark:bg-olive-dark rounded-full shadow-sm transition-transform duration-300 ${pushNotifs ? 'translate-x-6' : 'translate-x-0'}`} />
-                            </button>
-                        </div>
+                        ))}
                     </div>
                 </div>
             )}

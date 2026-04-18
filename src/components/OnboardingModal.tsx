@@ -13,6 +13,17 @@ export const OnboardingModal: React.FC = () => {
   const [preferences, setPreferences] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  React.useEffect(() => {
+    if (user && user.onboarded === false) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [user, user?.onboarded]);
+
   if (!user || user.onboarded !== false) return null;
 
   const togglePreference = (cat: string) => {

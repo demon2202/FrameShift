@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 // Force refresh
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Bookmark, ArrowUpRight } from 'lucide-react';
+import { Heart, Bookmark, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Poster } from '../types';
 import { useGlobalContext } from '../context/GlobalContext';
 import { OptimizedImage } from './ui/OptimizedImage';
+import toast from 'react-hot-toast';
 
 interface PosterCardProps {
   poster: Poster;
@@ -54,14 +55,32 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({ poster, onCli
     }
   };
 
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/#/explore?poster=${poster.id}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Link copied to clipboard!', {
+      style: {
+        background: '#CCFF00',
+        color: '#2C3B2D',
+        fontWeight: 'bold',
+        borderRadius: '0px',
+      },
+      iconTheme: {
+        primary: '#2C3B2D',
+        secondary: '#CCFF00',
+      }
+    });
+  };
+
   return (
     <motion.div
       layoutId={`poster-card-${poster.id}`}
-      className={`relative break-inside-avoid group cursor-pointer bg-cream dark:bg-neutral-900 mb-8 border border-transparent hover:border-olive-dark/20 dark:hover:border-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${featured ? 'h-full' : ''}`}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      className={`relative break-inside-avoid group cursor-pointer bg-cream dark:bg-neutral-900 mb-8 border border-transparent transition-all duration-300 ${featured ? 'h-full' : ''}`}
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
       viewport={{ once: true, margin: "0px 0px -50px 0px" }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
       onClick={() => onClick(poster)}
       onDoubleClick={handleDoubleClick}
     >
@@ -81,12 +100,52 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({ poster, onCli
             />
             
             {/* Hover Overlay */}
-            <div className={`absolute inset-0 bg-gradient-to-t from-olive-dark/80 via-olive-dark/20 to-transparent mix-blend-multiply opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-            
-            {/* Corner Accent */}
-            <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="bg-neon-lime text-olive-dark p-1">
-                    <ArrowUpRight size={20} />
+            <div className={`absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4`}>
+                {/* Top Actions */}
+                <div className="flex justify-end gap-2 translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300">
+                    <button 
+                        onClick={handleSave} 
+                        className="p-2 bg-white/10 hover:bg-neon-lime text-white hover:text-olive-dark backdrop-blur-md rounded-full transition-colors"
+                    >
+                        <Bookmark size={18} className={saved ? "fill-current" : ""} />
+                    </button>
+                    <button 
+                        onClick={handleShare} 
+                        className="p-2 bg-white/10 hover:bg-neon-lime text-white hover:text-olive-dark backdrop-blur-md rounded-full transition-colors"
+                    >
+                        <Share2 size={18} />
+                    </button>
+                </div>
+
+                {/* Bottom Info */}
+                <div className="translate-y-[10px] group-hover:translate-y-0 transition-transform duration-300">
+                    <h3 className="font-bold text-white uppercase text-lg tracking-tight leading-none mb-2 truncate">{poster.title}</h3>
+                    <div className="flex items-center justify-between">
+                        <div 
+                            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/profile/${poster.creatorId}`);
+                            }}
+                        >
+                            <OptimizedImage 
+                                src={poster.creator?.avatar} 
+                                alt={poster.creator?.username} 
+                                className="w-6 h-6 rounded-full border border-white/20"
+                                containerClassName="w-6 h-6 rounded-full"
+                            />
+                            <span className="font-mono text-xs text-white/90 uppercase tracking-wider truncate max-w-[120px]">
+                                @{poster.creator?.username || 'unknown'}
+                            </span>
+                        </div>
+                        <button 
+                            onClick={handleLike} 
+                            className="flex items-center gap-1.5 text-white hover:text-neon-lime transition-colors"
+                        >
+                            <Heart size={16} className={liked ? "fill-neon-lime text-neon-lime" : ""} />
+                            <span className="font-mono text-xs font-bold">{totalLikes}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </motion.div>
@@ -105,24 +164,6 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({ poster, onCli
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-
-      {/* Minimal Info Bar */}
-      <div className="pt-3 flex justify-between items-start">
-          <div>
-              <h3 className="font-bold text-olive-dark dark:text-cream uppercase text-sm tracking-tight leading-none mb-1 group-hover:text-green-600 dark:group-hover:text-neon-lime transition-colors">{poster.title}</h3>
-              <p className="font-mono text-[10px] text-olive-dark/60 dark:text-cream/60 uppercase tracking-wider">@{poster.creator?.username || 'unknown'}</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-              <button onClick={handleLike} className="group/btn flex items-center gap-1 hover:text-green-600 dark:hover:text-neon-lime transition-colors">
-                  <Heart size={16} className={liked ? "fill-neon-lime text-neon-lime" : "text-olive-dark dark:text-cream"} />
-                  <span className="font-mono text-[10px] text-olive-dark dark:text-cream">{totalLikes}</span>
-              </button>
-              <button onClick={handleSave} className="hover:text-green-600 dark:hover:text-neon-lime transition-colors">
-                  <Bookmark size={16} className={saved ? "fill-olive-dark text-olive-dark dark:fill-cream dark:text-cream" : "text-olive-dark dark:text-cream"} />
-              </button>
-          </div>
       </div>
     </motion.div>
   );

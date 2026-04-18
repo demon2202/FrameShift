@@ -16,6 +16,17 @@ interface UserListModalProps {
 export const UserListModal: React.FC<UserListModalProps> = ({ isOpen, onClose, title, users }) => {
   const { user: currentUser, isFollowing, toggleFollow, hasRequestedFollow } = useGlobalContext();
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (

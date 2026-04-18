@@ -3,8 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FrameShift</title>
+    <title>PosterVerse</title>
     <meta name="description" content="A social-first creative platform where designers publish poster artwork, follow other creators, and discover visual inspiration." />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#CCFF00" />
+    <script>
+      // Register SW
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW setup failed'));
+        });
+      }
+    </script>
     <script>
       (function() {
         try {
