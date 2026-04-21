@@ -1,6 +1,6 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, FirebaseApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 // Import the Firebase configuration as fallback
 import firebaseConfigFile from '../firebase-applet-config.json';
@@ -16,8 +16,24 @@ const firebaseConfig = {
   firestoreDatabaseId: import.meta.env.VITE_FIRESTORE_DATABASE_ID || firebaseConfigFile.firestoreDatabaseId
 };
 
-// Initialize Firebase SDK
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+// Lazy initialization pattern to avoid crashing at module load if config is missing
+export const isFirebaseConfigured = !!firebaseConfig.projectId && !!firebaseConfig.apiKey;
+
+let app: FirebaseApp;
+let db: Firestore;
+let auth: Auth;
 export const googleProvider = new GoogleAuthProvider();
+
+if (isFirebaseConfigured) {
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+    auth = getAuth(app);
+  } catch (err) {
+    console.error("Firebase initialization failed:", err);
+  }
+} else {
+  console.warn("Firebase is not configured! Please provide configuration or set up Firebase.");
+}
+
+export { app, db, auth };

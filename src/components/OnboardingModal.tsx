@@ -6,12 +6,51 @@ import { Sparkles, Check } from 'lucide-react';
 const CATEGORIES = ['Art', 'Design', 'Photography', 'Typography', 'Illustration', '3D', 'Minimalism', 'Abstract', 'Nature', 'Cyberpunk'];
 
 export const OnboardingModal: React.FC = () => {
-  const { user, updateUserProfile } = useGlobalContext();
+  const { user, updateUserProfile, checkUsernameExists } = useGlobalContext();
   const [step, setStep] = useState(1);
-  const [username, setUsername] = useState(user?.username || '');
-  const [name, setName] = useState(user?.name || '');
+  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
   const [preferences, setPreferences] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+
+  const checkTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+
+  React.useEffect(() => {
+    if (user?.name) setName(user.name);
+    if (user?.username) setUsername(user.username);
+  }, [user?.name, user?.username]);
+
+  React.useEffect(() => {
+    const cleanUsername = username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+    if (!cleanUsername || (user && cleanUsername === user.username)) {
+      setUsernameError(null);
+      return;
+    }
+
+    setIsCheckingUsername(true);
+    setUsernameError(null);
+    clearTimeout(checkTimeoutRef.current);
+
+    checkTimeoutRef.current = setTimeout(async () => {
+      try {
+        const _user = user as any;
+        const exists = await checkUsernameExists(cleanUsername, _user?.id);
+        if (exists) {
+          setUsernameError('Username is already taken');
+        } else {
+          setUsernameError(null);
+        }
+      } catch (err) {
+        setUsernameError('Error checking username');
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(checkTimeoutRef.current);
+  }, [username, user]);
 
   React.useEffect(() => {
     if (user && user.onboarded === false) {
@@ -33,15 +72,21 @@ export const OnboardingModal: React.FC = () => {
   };
 
   const handleComplete = async () => {
-    if (!username.trim() || !name.trim()) return;
+    const cleanUsername = username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+    if (!cleanUsername || !name.trim()) return;
     setIsSaving(true);
-    await updateUserProfile({
-      username: username.trim(),
-      name: name.trim(),
-      feedPreferences: preferences,
-      onboarded: true
-    });
-    setIsSaving(false);
+    try {
+      await updateUserProfile({
+        username: cleanUsername,
+        name: name.trim(),
+        feedPreferences: preferences,
+        onboarded: true
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to complete onboarding');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -77,19 +122,33 @@ export const OnboardingModal: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-olive-dark/60 uppercase tracking-wider mb-2">Username</label>
-                    <input 
-                      type="text" 
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full bg-cream border border-olive-dark/10 rounded-xl px-4 py-3 text-olive-dark font-medium focus:outline-none focus:border-olive-dark/30 transition-colors"
-                      placeholder="username"
-                    />
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())}
+                        className={`w-full bg-cream border rounded-xl px-4 py-3 text-olive-dark font-medium focus:outline-none transition-colors ${
+                          usernameError 
+                            ? 'border-red-500 focus:border-red-500' 
+                            : 'border-olive-dark/10 focus:border-olive-dark/30'
+                        }`}
+                        placeholder="username"
+                      />
+                      {isCheckingUsername && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                          <div className="w-4 h-4 border-2 border-olive-dark/30 border-t-olive-dark/60 rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    {usernameError && (
+                      <p className="text-red-500 text-xs font-bold mt-2">{usernameError}</p>
+                    )}
                   </div>
                 </div>
 
                 <button 
                   onClick={() => setStep(2)}
-                  disabled={!username.trim() || !name.trim()}
+                  disabled={!username.trim() || !name.trim() || !!usernameError || isCheckingUsername}
                   className="w-full mt-8 bg-olive-dark text-neon-lime font-bold py-4 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   Continue

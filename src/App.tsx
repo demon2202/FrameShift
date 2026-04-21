@@ -15,11 +15,14 @@ import { OnboardingModal } from './components/OnboardingModal';
 
 import { Toaster } from 'react-hot-toast';
 
+import { AppSkeleton } from './components/AppSkeleton';
+import { AnimatePresence, motion } from 'framer-motion';
+
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-cream dark:bg-neutral-900 text-olive-dark dark:text-cream transition-colors duration-300">
       <div className="grain" />
-      <main className={`flex-1 w-full`}>
+      <main className={`flex-1 w-full pb-16 md:pb-0`}>
         {children}
       </main>
       <BottomNav />
@@ -45,10 +48,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-import { AppSkeleton } from './components/AppSkeleton';
-
-import { AnimatePresence, motion } from 'framer-motion';
-
 const AppContent: React.FC = () => {
   const { isLoading } = useGlobalContext();
   const [minTimePassed, setMinTimePassed] = useState(false);
@@ -63,71 +62,74 @@ const AppContent: React.FC = () => {
   const showLoading = isLoading || !minTimePassed;
 
   return (
-    <>
-      <AnimatePresence mode="wait">
-        {showLoading && (
-          <motion.div
-            key="loading-screen"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.8, ease: "easeInOut" }}
-            className="fixed inset-0 z-[9999]"
-          >
-            <AppSkeleton />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {!showLoading && (
-        <HashRouter>
-          <AppLayout>
-            <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/explore" element={<Explore />} />
-          
-          {/* Fix for external links/params trying to route to stories-rail */}
-          <Route path="/stories-rail" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
-          <Route path="/stories-rail/" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
-          
-          {/* Protected Routes */}
-          <Route 
-            path="/profile" 
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/profile/:userId" 
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/analytics" 
-            element={
-              <ProtectedRoute>
-                <Analytics />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/messages" 
-            element={
-              <ProtectedRoute>
-                <Messages />
-              </ProtectedRoute>
-            } 
-          />
-        </Routes>
-      </AppLayout>
-    </HashRouter>
-    )}
-    </>
+    <AnimatePresence mode="wait">
+      {showLoading ? (
+        <motion.div
+          key="loading-screen"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          className="fixed inset-0 z-[9999]"
+        >
+          <AppSkeleton />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="app-content"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <HashRouter>
+            <AppLayout>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/explore" element={<Explore />} />
+                
+                {/* Fix for external links/params trying to route to stories-rail */}
+                <Route path="/stories-rail" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
+                <Route path="/stories-rail/" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
+                
+                {/* Protected Routes */}
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/profile/:userId" 
+                  element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/analytics" 
+                  element={
+                    <ProtectedRoute>
+                      <Analytics />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/messages" 
+                  element={
+                    <ProtectedRoute>
+                      <Messages />
+                    </ProtectedRoute>
+                  } 
+                />
+              </Routes>
+            </AppLayout>
+          </HashRouter>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 

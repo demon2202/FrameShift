@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 const EMOJIS = ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '❤️', '🔥', '✨', '💀', '💯'];
 
 export const Messages: React.FC = () => {
-  const { user, getConversations, getMessages, sendMessage, deleteMessage, allUsers, getOrCreateThread, posters, setTypingStatus, isFollowing, isFollowedBy, isBlocked, compressImage } = useGlobalContext();
+  const { user, getConversations, getMessages, sendMessage, deleteMessage, allUsers, getOrCreateThread, posters, setTypingStatus, isFollowing, isFollowedBy, isBlocked, compressImage, searchUsersDB } = useGlobalContext();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
@@ -200,20 +200,37 @@ export const Messages: React.FC = () => {
       }
   };
 
-  const filteredUsers = useMemo(() => {
-      if (!searchUser) return allUsers.filter(u => u.id !== user?.id).slice(0, 10);
-      return allUsers.filter(u => 
-        u.id !== user?.id && 
-        (u.username.toLowerCase().includes(searchUser.toLowerCase()) || 
-         u.name.toLowerCase().includes(searchUser.toLowerCase()))
-      );
-  }, [allUsers, searchUser, user]);
+  const [dbSearchUsers, setDbSearchUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const updateSearch = () => {
+      setDbSearchUsers([]);
+    };
+    if (!searchUser) {
+      updateSearch();
+      return;
+    }
+    const timeout = setTimeout(async () => {
+       try {
+         const res = await searchUsersDB(searchUser);
+         if (active) {
+            setDbSearchUsers(res.filter(u => u.id !== user?.id));
+         }
+       } catch (err) {
+         console.error(err);
+       }
+    }, 300);
+    return () => { active = false; clearTimeout(timeout); };
+  }, [searchUser, searchUsersDB, user]);
+
+  const filteredUsers = searchUser ? dbSearchUsers : allUsers.filter(u => u.id !== user?.id).slice(0, 10);
   
   return (
     <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white pt-24 flex flex-col h-screen overflow-hidden relative">
       <Navbar />
       
-      <div className="flex-1 max-w-5xl mx-auto w-full flex h-[calc(100vh-96px)] relative z-10 border-x border-gray-200 dark:border-gray-800">
+      <div className="flex-1 max-w-5xl mx-auto w-full flex h-[calc(100vh-96px)] relative z-10 border-x border-gray-200 dark:border-gray-800 pb-16 md:pb-0">
           {/* Thread List Sidebar */}
           <div className={`w-full md:w-[350px] flex flex-col bg-white dark:bg-black border-r border-gray-200 dark:border-gray-800 overflow-hidden ${selectedThreadId ? 'hidden md:flex' : 'flex'}`}>
               <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">

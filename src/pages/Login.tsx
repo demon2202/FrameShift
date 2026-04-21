@@ -7,7 +7,7 @@ import { ArrowRight, AlertCircle, Loader2, ArrowLeft, Mail } from 'lucide-react'
 import { ContourBackground } from '../components/ui/ContourBackground';
 
 export const Login: React.FC = () => {
-  const { login, loginWithEmail, registerWithEmail, user } = useGlobalContext();
+  const { login, loginWithEmail, registerWithEmail, user, resetPassword, checkUsernameExists } = useGlobalContext();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as any)?.from?.pathname || "/";
@@ -23,6 +23,40 @@ export const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const checkTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+
+  React.useEffect(() => {
+    if (mode !== 'register') return;
+    const cleanUsername = username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+    if (!cleanUsername) {
+      setUsernameError(null);
+      return;
+    }
+
+    setIsCheckingUsername(true);
+    setUsernameError(null);
+    clearTimeout(checkTimeoutRef.current);
+
+    checkTimeoutRef.current = setTimeout(async () => {
+      try {
+        const exists = await checkUsernameExists(cleanUsername);
+        if (exists) {
+          setUsernameError('Username is already taken');
+        } else {
+          setUsernameError(null);
+        }
+      } catch (err) {
+        setUsernameError('Error checking username');
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(checkTimeoutRef.current);
+  }, [username, mode, checkUsernameExists]);
 
   // If already logged in (or upon successful login), redirect
   useEffect(() => {
@@ -41,11 +75,12 @@ export const Login: React.FC = () => {
       if (mode === 'login') {
         await loginWithEmail(email, password);
       } else if (mode === 'register') {
-        await registerWithEmail(email, password, username, name);
+        const cleanUsername = username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+        if (!cleanUsername) throw new Error('Please provide a valid alphanumeric username (underscores allowed).');
+        await registerWithEmail(email, password, cleanUsername, name.trim());
       } else if (mode === 'forgot-password') {
-        // Mock Password Reset
-        await new Promise(resolve => setTimeout(resolve, 1500));
         if (!email.includes('@')) throw new Error('Please enter a valid email address.');
+        await resetPassword(email);
         setSuccessMessage(`Password reset link sent to ${email}`);
         setIsLoading(false);
         return; // Don't redirect
@@ -179,16 +214,30 @@ export const Login: React.FC = () => {
                         </div>
                         <div className="space-y-2">
                             <label htmlFor="username" className="text-xs font-bold text-cream/40 uppercase tracking-widest">Username</label>
-                            <input 
-                                id="username"
-                                type="text" 
-                                placeholder="@janedoe" 
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                className="w-full bg-olive-dark border border-cream/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime focus:ring-1 focus:ring-neon-lime/20 outline-none transition-all placeholder-cream/20 font-medium"
-                                required={mode === 'register'}
-                                aria-required={mode === 'register'}
-                            />
+                            <div className="relative">
+                                <input 
+                                    id="username"
+                                    type="text" 
+                                    placeholder="@janedoe" 
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())}
+                                    className={`w-full bg-olive-dark border rounded-xl px-4 py-3 text-cream outline-none transition-all placeholder-cream/20 font-medium ${
+                                        usernameError 
+                                            ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' 
+                                            : 'border-cream/10 focus:border-neon-lime focus:ring-1 focus:ring-neon-lime/20'
+                                    }`}
+                                    required={mode === 'register'}
+                                    aria-required={mode === 'register'}
+                                />
+                                {isCheckingUsername && (
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                        <div className="w-4 h-4 border-2 border-cream/30 border-t-cream/60 rounded-full animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+                            {usernameError && (
+                                <p className="text-red-500 text-xs font-bold mt-1">{usernameError}</p>
+                            )}
                         </div>
                     </motion.div>
                 )}
@@ -250,7 +299,7 @@ export const Login: React.FC = () => {
             <div className="pt-6 space-y-4">
                 <button 
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || (mode === 'register' && (!!usernameError || isCheckingUsername))}
                     className="w-full py-4 bg-neon-lime text-olive-dark font-sans font-black text-lg tracking-wide rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-neon-lime/20"
                     aria-label={isLoading ? "Processing" : (mode === 'login' ? 'Sign In' : mode === 'register' ? 'Sign Up' : 'Send Reset Link')}
                 >

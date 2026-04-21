@@ -23,7 +23,7 @@ export const Navbar: React.FC = () => {
   const [isHidden, setIsHidden] = useState(false);
   const lastScrollY = useRef(0);
   
-  const { notifications, unreadCount, markAsRead, user, logout, posters, allUsers, acceptFollowRequest, declineFollowRequest, setUploadModalMode, theme, toggleTheme } = useGlobalContext();
+  const { notifications, unreadCount, markAsRead, user, logout, posters, allUsers, acceptFollowRequest, declineFollowRequest, setUploadModalMode, theme, toggleTheme, searchUsersDB, searchPostersDB } = useGlobalContext();
 
   const menuItems: SidebarMenuItem[] = useMemo(() => {
     const items: SidebarMenuItem[] = [
@@ -112,33 +112,83 @@ export const Navbar: React.FC = () => {
     ? 'text-cream' 
     : (theme === 'dark' ? 'text-cream' : 'text-olive-dark');
 
-  // Improved Search Logic
-  const filteredUsers = useMemo(() => {
-    if (searchFilter === 'Posters' || searchFilter === 'Tags') return [];
-    if (!searchQuery) return [];
-    
-    const q = searchQuery.toLowerCase().replace('@', '');
-    return allUsers.filter(u => 
-        (u.username.toLowerCase().includes(q) || u.name.toLowerCase().includes(q)) &&
-        (!user?.blockedUsers?.includes(u.id)) // Filter blocked users
-    ).slice(0, 5);
-  }, [searchQuery, searchFilter, allUsers, user]);
+  const [dbFilteredUsers, setDbFilteredUsers] = useState<any[]>([]);
+  const [dbFilteredPosters, setDbFilteredPosters] = useState<any[]>([]);
+  const [isSearchingDB, setIsSearchingDB] = useState(false);
 
-  const filteredPosters = useMemo(() => {
-    if (searchFilter === 'Creators') return [];
-    if (!searchQuery) return [];
-    
-    const q = searchQuery.toLowerCase();
-    
-    return posters.filter(p => {
-        const titleMatch = p.title.toLowerCase().includes(q);
-        const tagMatch = p.tags.some(t => t.toLowerCase().includes(q));
-        
-        if (searchFilter === 'Posters') return titleMatch;
-        if (searchFilter === 'Tags') return tagMatch;
-        return titleMatch || tagMatch;
-    }).slice(0, 5);
-  }, [searchQuery, searchFilter, posters]);
+  useEffect(() => {
+    let active = true;
+    if (!searchQuery) {
+      setDbFilteredUsers([]);
+      setDbFilteredPosters([]);
+      setIsSearchingDB(false);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      setIsSearchingDB(true);
+      try {
+        const [uResults, pResults] = await Promise.all([
+           searchFilter !== 'Posters' && searchFilter !== 'Tags' ? searchUsersDB(searchQuery) : Promise.resolve([]),
+           searchFilter !== 'Creators' ? searchPostersDB(searchQuery, searchFilter as any) : Promise.resolve([])
+        ]);
+        if (active) {
+          let finalUsers = uResults;
+          // Local fallback for users
+          if (searchFilter === 'All' || searchFilter === 'Creators') {
+             const localMatchUsers = allUsers.filter(u => 
+                (u.username && u.username.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                (u.name && u.name.toLowerCase().includes(searchQuery.toLowerCase()))
+             );
+             const combinedUsers = [...uResults, ...localMatchUsers];
+             finalUsers = Array.from(new Set(combinedUsers.map(u => u.id)))
+                .map(id => combinedUsers.find(u => u.id === id))
+                .filter((u): u is any => u !== undefined);
+          } else {
+             finalUsers = [];
+          }
+
+          if (user && user.blockedUsers) {
+             finalUsers = finalUsers.filter(u => !user.blockedUsers!.includes(u.id));
+          }
+          // We can also fallback to the allUsers array if it's small,
+          // but relying completely on searchUsersDB fulfills "optimized query" requirement.
+          setDbFilteredUsers(finalUsers.slice(0, 5));
+          
+          let finalPosters = pResults;
+          
+          if (searchFilter === 'Tags') {
+            const localTags = posters.filter(p => p.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())));
+            const combined = [...pResults, ...localTags];
+            finalPosters = Array.from(new Set(combined.map(p => p.id)))
+                .map(id => combined.find(p => p.id === id))
+                .filter((p): p is any => p !== undefined);
+          } else if (searchFilter === 'All' || searchFilter === 'Posters') {
+             const localTitles = posters.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+             const combined = [...pResults, ...localTitles];
+             finalPosters = Array.from(new Set(combined.map(p => p.id)))
+                .map(id => combined.find(p => p.id === id))
+                .filter((p): p is any => p !== undefined);
+          } else {
+             // Creators tab, posters should be empty
+             finalPosters = [];
+          }
+          setDbFilteredPosters(finalPosters.slice(0, 5));
+        }
+      } catch (err) {
+        console.error("Search error", err);
+      } finally {
+        if (active) setIsSearchingDB(false);
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, searchFilter, searchUsersDB, searchPostersDB, posters, user]);
+
+  const filteredUsers = dbFilteredUsers;
+  const filteredPosters = dbFilteredPosters;
 
   // Unified list for keyboard navigation
   const navigableItems = useMemo(() => {
@@ -231,7 +281,7 @@ export const Navbar: React.FC = () => {
           
           {/* Logo - Side by Side & Bold */}
           <div className="flex-shrink-0">
-            <Link to="/" className="flex items-baseline gap-1 leading-none group relative z-50">
+            <Link to="/" className="flex items-baseline gap-1 leading-none group relative z-50 whitespace-nowrap">
                 <span className={`font-display font-black text-2xl md:text-4xl tracking-tighter uppercase ${textColor} group-hover:text-green-600 dark:group-hover:text-neon-lime transition-colors`}>Frame</span>
                 <span className={`font-serif italic font-light text-2xl md:text-4xl tracking-tight ${isHomePage && !user && !isScrolled ? 'text-neon-lime' : 'text-green-600 dark:text-neon-lime'} group-hover:text-olive-dark dark:group-hover:text-cream transition-colors`}>Shift</span>
             </Link>

@@ -143,7 +143,13 @@ export const Home: React.FC = () => {
             
             {/* 1. Spotlight Banner - Massive & Editorial */}
             {spotlightPoster && (
-                <section className="relative w-full aspect-[4/5] md:aspect-[2/1] overflow-hidden group cursor-pointer rounded-none md:rounded-3xl" onClick={() => setSelectedPoster(spotlightPoster)}>
+                <motion.section 
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="relative w-full aspect-[4/5] md:aspect-[2/1] overflow-hidden group cursor-pointer rounded-none md:rounded-3xl" onClick={() => setSelectedPoster(spotlightPoster)}
+                >
                     <div className="absolute inset-0 bg-black transition-transform duration-1000 group-hover:scale-[1.02]">
                          <OptimizedImage src={spotlightPoster.imageUrl} className="w-full h-full object-cover opacity-70 group-hover:opacity-50 transition-all duration-700 grayscale group-hover:grayscale-0" alt={spotlightPoster.title} containerClassName="w-full h-full" />
                          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90" />
@@ -191,26 +197,42 @@ export const Home: React.FC = () => {
                             </div>
                         </div>
                     </div>
-                </section>
+                </motion.section>
             )}
 
 
 
             {/* 3. Feed Header & Filters */}
             <section>
-                    <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-8 border-b border-olive-dark/10 dark:border-white/10 pb-8">
+                    <motion.div 
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, margin: "-50px" }}
+                        transition={{ duration: 0.6, ease: "easeOut" }}
+                        className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-8 border-b border-olive-dark/10 dark:border-white/10 pb-8"
+                    >
                         <div>
                             <h1 className="text-5xl sm:text-7xl md:text-8xl font-display font-black text-olive-dark dark:text-cream uppercase tracking-tighter leading-[0.8]">The Feed</h1>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Enhanced Stories Rail - Editorial Style */}
                     <div id="stories-rail" className="mb-8 scroll-mt-32">
-                        <div className="flex items-center gap-2 mb-6">
+                        <motion.div 
+                            initial={{ opacity: 0, x: -20 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true, margin: "-50px" }}
+                            transition={{ duration: 0.5, delay: 0.1 }}
+                            className="flex items-center gap-2 mb-6"
+                        >
                             <span className="w-2 h-2 bg-neon-lime rounded-full animate-pulse"></span>
                             <h3 className="text-xs font-bold uppercase tracking-widest text-olive-dark/60 dark:text-cream/60">Live Stories</h3>
-                        </div>
-                        <div 
+                        </motion.div>
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true, margin: "-50px" }}
+                          transition={{ duration: 0.6, delay: 0.2 }}
                           className="flex items-center gap-6 overflow-x-auto no-scrollbar py-2 touch-pan-x select-none"
                           onMouseDown={(e) => {
                             const ele = e.currentTarget;
@@ -280,7 +302,7 @@ export const Home: React.FC = () => {
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-olive-dark dark:text-cream truncate w-20 text-center group-hover:text-green-600 dark:group-hover:text-neon-lime transition-colors">{group.user.username || 'unknown'}</span>
                                 </motion.div>
                             ))}
-                        </div>
+                        </motion.div>
                     </div>
                         
                     {/* Filter Bar */}
@@ -376,7 +398,13 @@ export const Home: React.FC = () => {
                             )}
                         </>
                     ) : (
-                        <div className="flex flex-col items-center justify-center py-40 text-center border border-dashed border-olive-dark/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm">
+                        <motion.div 
+                          initial={{ opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
+                          className="flex flex-col items-center justify-center py-40 text-center border border-dashed border-olive-dark/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm"
+                        >
                             <div className="w-24 h-24 bg-olive-dark dark:bg-cream text-neon-lime dark:text-olive-dark rounded-full flex items-center justify-center mb-8 shadow-xl shadow-neon-lime/20">
                                 <Compass size={48} />
                             </div>
@@ -385,7 +413,7 @@ export const Home: React.FC = () => {
                             <Link to="/explore" className="px-10 py-5 bg-neon-lime text-olive-dark font-black uppercase tracking-widest hover:bg-olive-dark hover:text-neon-lime transition-all shadow-lg hover:shadow-xl">
                                 Explore The Archive
                             </Link>
-                        </div>
+                        </motion.div>
                     )}
                 </section>
 
@@ -394,7 +422,13 @@ export const Home: React.FC = () => {
       </main>
 
       {/* Global Footer */}
-      <footer className="w-full border-t border-olive-dark/10 dark:border-white/10 py-12 px-4 md:px-8 mt-12 bg-cream dark:bg-neutral-900">
+      <motion.footer 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-20px" }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full border-t border-olive-dark/10 dark:border-white/10 py-12 px-4 md:px-8 mt-12 bg-cream dark:bg-neutral-900"
+      >
         <div className="max-w-7xl mx-auto flex flex-col items-center">
             <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-mono uppercase text-olive-dark/60 dark:text-cream/60 mb-8">
                 {(['About', 'Manifesto', 'Terms', 'Privacy'] as InfoType[]).map(link => (
@@ -411,7 +445,7 @@ export const Home: React.FC = () => {
                 © 2025 FrameShift Studio
             </div>
         </div>
-      </footer>
+      </motion.footer>
 
       <PosterModal 
         key={selectedPoster?.id}

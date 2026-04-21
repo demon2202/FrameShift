@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Compass, Plus, BarChart2, User } from 'lucide-react';
+import { Home, Compass, Plus, MessageSquare, User } from 'lucide-react';
 import { useGlobalContext } from '../context/GlobalContext';
 import { OptimizedImage } from './ui/OptimizedImage';
 import { UploadModal } from './UploadModal';
@@ -47,15 +47,15 @@ export const BottomNav: React.FC = () => {
         <button 
           onClick={() => {
               if (user) {
-                  navigate('/analytics');
+                  navigate('/messages');
               } else {
                   navigate('/login');
               }
           }}
           className="relative p-2 group"
         >
-          <BarChart2 size={24} className={`transition-colors ${isActive('/analytics') ? 'text-neon-lime' : 'text-cream/50'}`} strokeWidth={isActive('/analytics') ? 2.5 : 2} />
-          {isActive('/analytics') && <motion.div layoutId="bottomNavIndicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-neon-lime rounded-full" />}
+          <MessageSquare size={24} className={`transition-colors ${isActive('/messages') ? 'text-neon-lime' : 'text-cream/50'}`} strokeWidth={isActive('/messages') ? 2.5 : 2} />
+          {isActive('/messages') && <motion.div layoutId="bottomNavIndicator" className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-neon-lime rounded-full" />}
         </button>
 
         <Link to={user ? `/profile/${user.id}` : '/login'} className="relative p-2 group">

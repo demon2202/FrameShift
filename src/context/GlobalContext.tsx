@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { User, Poster, Follow, Message, Story, Like, Saved, Notification, Comment, Challenge, ChallengeEntry, Thread, Collection } from '../types';
 import { db, auth, googleProvider } from '../firebase';
-import { collection, doc, setDoc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, arrayUnion, arrayRemove, writeBatch, addDoc, increment, limit } from 'firebase/firestore';
-import { signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword as updateFirebasePassword, deleteUser } from 'firebase/auth';
+import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, arrayUnion, arrayRemove, writeBatch, addDoc, increment, limit } from 'firebase/firestore';
+import { signInWithPopup, signOut, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword as updateFirebasePassword, deleteUser, sendPasswordResetEmail } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
 enum OperationType {
@@ -124,6 +124,11 @@ interface GlobalContextType {
   setTypingStatus: (threadId: string, isTyping: boolean) => Promise<void>;
   markThreadRead: (threadId: string) => Promise<void>;
   getOrCreateThread: (otherUserId: string) => Promise<string>;
+  resetPassword: (email: string) => Promise<void>;
+  
+  searchUsersDB: (queryStr: string) => Promise<User[]>;
+  searchPostersDB: (queryStr: string, searchType?: 'Tags' | 'All' | 'Posters') => Promise<Poster[]>;
+  checkUsernameExists: (username: string, excludeUserId?: string) => Promise<boolean>;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
@@ -172,6 +177,23 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [challengeEntries] = useState<ChallengeEntry[]>([]);
 
   // Auth Listener
+  const checkUsernameExists = async (username: string, excludeUserId?: string): Promise<boolean> => {
+    try {
+      const q = query(collection(db, 'users'), where('username', '==', username), limit(2));
+      const snaps = await getDocs(q);
+      if (snaps.empty) return false;
+      if (excludeUserId) {
+        // If there's a match but it's the current user, it's fine.
+        // If there's another match, then it exists.
+        return snaps.docs.some(doc => doc.id !== excludeUserId);
+      }
+      return true;
+    } catch (e) {
+      console.error("Error checking username:", e);
+      return false;
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -181,9 +203,18 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             setUser(userDoc.data() as User);
           } else {
             // Create new user profile
+            const rawBase = firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`;
+            const baseUsername = rawBase.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() || `user_${firebaseUser.uid.substring(0, 5)}`;
+            let candidateUsername = baseUsername;
+            let counter = 1;
+            while (await checkUsernameExists(candidateUsername)) {
+              candidateUsername = `${baseUsername}${counter}`;
+              counter++;
+            }
+
             const newUser: User = {
               id: firebaseUser.uid,
-              username: firebaseUser.email?.split('@')[0] || `user_${firebaseUser.uid.substring(0, 5)}`,
+              username: candidateUsername,
               name: firebaseUser.displayName || 'New User',
               avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
               bio: '',
@@ -357,6 +388,10 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const registerWithEmail = async (e: string, p: string, u: string, n: string) => {
     try {
+      if (await checkUsernameExists(u)) {
+        throw new Error("Username already taken. Please choose another one.");
+      }
+      
       const cred = await createUserWithEmailAndPassword(auth, e, p);
       const newUser: User = {
         id: cred.user.uid,
@@ -383,6 +418,15 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error("Password reset failed", error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     signOut(auth);
     setThreads([]);
@@ -393,325 +437,22 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const updateUserProfile = async (data: Partial<User>) => {
     if (!user) return;
     try {
+      if (data.username && data.username !== user.username) {
+        if (await checkUsernameExists(data.username, user.id)) {
+          throw new Error("Username already taken. Please choose another one.");
+        }
+      }
       await updateDoc(doc(db, 'users', user.id), data);
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.id}`);
+      throw error; // Rethrow to allow caller (e.g. SettingsModal) to handle and display error
     }
   };
 
-  const MOCK_POSTERS: Poster[] = useMemo(() => [
-    {
-      id: 'mock-1',
-      creatorId: 'mock-user-1',
-      title: 'Neon Drift',
-      description: 'A cyberpunk car drifting through neon streets.',
-      imageUrl: 'https://images.unsplash.com/photo-1614200187524-dc4b892acf16?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Cars', 'Cyberpunk', 'Neon'],
-      likes: 120,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ff00ff', '#00ffff'],
-      license: 'personal',
-      creator: { id: 'mock-user-1', username: 'neon_rider', name: 'Neon Rider', avatar: 'https://i.pravatar.cc/150?u=mock-user-1', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-2',
-      creatorId: 'mock-user-2',
-      title: 'Samurai Soul',
-      description: 'A dark anime samurai with a glowing sword.',
-      imageUrl: 'https://images.unsplash.com/photo-1580477371194-4593e3c7c6cb?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Swords', 'Anime', 'Dark'],
-      likes: 340,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#000000', '#ff0000'],
-      license: 'personal',
-      creator: { id: 'mock-user-2', username: 'blade_master', name: 'Blade Master', avatar: 'https://i.pravatar.cc/150?u=mock-user-2', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-3',
-      creatorId: 'mock-user-3',
-      title: 'Midnight Run',
-      description: 'A black car racing through the night.',
-      imageUrl: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Cars', 'Black', 'Night'],
-      likes: 89,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#000000', '#333333'],
-      license: 'personal',
-      creator: { id: 'mock-user-3', username: 'night_driver', name: 'Night Driver', avatar: 'https://i.pravatar.cc/150?u=mock-user-3', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-4',
-      creatorId: 'mock-user-4',
-      title: 'Blade Master',
-      description: 'A minimal red sword design.',
-      imageUrl: 'https://images.unsplash.com/photo-1589652717521-10c0d092dea9?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Swords', 'Minimal', 'Red'],
-      likes: 210,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ff0000', '#ffffff'],
-      license: 'personal',
-      creator: { id: 'mock-user-4', username: 'red_blade', name: 'Red Blade', avatar: 'https://i.pravatar.cc/150?u=mock-user-4', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-5',
-      creatorId: 'mock-user-5',
-      title: 'Tokyo Streets',
-      description: 'Anime style cyberpunk city streets.',
-      imageUrl: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Anime', 'Cyberpunk', 'City'],
-      likes: 450,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ff00ff', '#0000ff'],
-      license: 'personal',
-      creator: { id: 'mock-user-5', username: 'tokyo_dreamer', name: 'Tokyo Dreamer', avatar: 'https://i.pravatar.cc/150?u=mock-user-5', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-6',
-      creatorId: 'mock-user-6',
-      title: 'Cyber Ninja',
-      description: 'A cyber ninja in action.',
-      imageUrl: 'https://images.unsplash.com/photo-1535295972055-1c762f4483e5?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Cyberpunk', 'Ninja', 'Action'],
-      likes: 560,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#00ff00', '#000000'],
-      license: 'personal',
-      creator: { id: 'mock-user-6', username: 'cyber_ninja', name: 'Cyber Ninja', avatar: 'https://i.pravatar.cc/150?u=mock-user-6', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-7',
-      creatorId: 'mock-user-7',
-      title: 'Pixel Art',
-      description: 'A beautiful pixel art landscape.',
-      imageUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Pixel', 'Art', 'Landscape'],
-      likes: 320,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ff0000', '#00ff00'],
-      license: 'personal',
-      creator: { id: 'mock-user-7', username: 'pixel_art', name: 'Pixel Art', avatar: 'https://i.pravatar.cc/150?u=mock-user-7', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-8',
-      creatorId: 'mock-user-8',
-      title: 'Retro Wave',
-      description: 'A retro wave sunset.',
-      imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Retro', 'Wave', 'Sunset'],
-      likes: 410,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ff00ff', '#ffff00'],
-      license: 'personal',
-      creator: { id: 'mock-user-8', username: 'retro_wave', name: 'Retro Wave', avatar: 'https://i.pravatar.cc/150?u=mock-user-8', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-9',
-      creatorId: 'mock-user-9',
-      title: 'Future Bass',
-      description: 'A futuristic bass stage.',
-      imageUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Future', 'Bass', 'Music'],
-      likes: 290,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#0000ff', '#ff00ff'],
-      license: 'personal',
-      creator: { id: 'mock-user-9', username: 'future_bass', name: 'Future Bass', avatar: 'https://i.pravatar.cc/150?u=mock-user-9', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-10',
-      creatorId: 'mock-user-10',
-      title: 'Synth Pop',
-      description: 'A synth pop concert.',
-      imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Synth', 'Pop', 'Concert'],
-      likes: 380,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ff0000', '#0000ff'],
-      license: 'personal',
-      creator: { id: 'mock-user-10', username: 'synth_pop', name: 'Synth Pop', avatar: 'https://i.pravatar.cc/150?u=mock-user-10', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-11',
-      creatorId: 'mock-user-11',
-      title: 'Vapor Wave',
-      description: 'A vapor wave aesthetic.',
-      imageUrl: 'https://images.unsplash.com/photo-1557672172-298e090bd0f1?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Vapor', 'Wave', 'Aesthetic'],
-      likes: 470,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#00ffff', '#ff00ff'],
-      license: 'personal',
-      creator: { id: 'mock-user-11', username: 'vapor_wave', name: 'Vapor Wave', avatar: 'https://i.pravatar.cc/150?u=mock-user-11', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-12',
-      creatorId: 'mock-user-12',
-      title: 'Lofi Beats',
-      description: 'A lofi beats study room.',
-      imageUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Lofi', 'Beats', 'Study'],
-      likes: 520,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ffff00', '#00ff00'],
-      license: 'personal',
-      creator: { id: 'mock-user-12', username: 'lofi_beats', name: 'Lofi Beats', avatar: 'https://i.pravatar.cc/150?u=mock-user-12', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-13',
-      creatorId: 'mock-user-13',
-      title: 'Chill Hop',
-      description: 'A chill hop cafe.',
-      imageUrl: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Chill', 'Hop', 'Cafe'],
-      likes: 310,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#ff0000', '#ffff00'],
-      license: 'personal',
-      creator: { id: 'mock-user-13', username: 'chill_hop', name: 'Chill Hop', avatar: 'https://i.pravatar.cc/150?u=mock-user-13', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-14',
-      creatorId: 'mock-user-14',
-      title: 'Ambient Sound',
-      description: 'An ambient sound landscape.',
-      imageUrl: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Ambient', 'Sound', 'Landscape'],
-      likes: 280,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#0000ff', '#00ffff'],
-      license: 'personal',
-      creator: { id: 'mock-user-14', username: 'ambient_sound', name: 'Ambient Sound', avatar: 'https://i.pravatar.cc/150?u=mock-user-14', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    },
-    {
-      id: 'mock-15',
-      creatorId: 'mock-user-15',
-      title: 'Space Cadet',
-      description: 'A space cadet exploring the galaxy.',
-      imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop',
-      tags: ['Space', 'Cadet', 'Galaxy'],
-      likes: 600,
-      createdAt: "2026-04-03T11:00:00.000Z",
-      colors: ['#000000', '#ffffff'],
-      license: 'personal',
-      creator: { id: 'mock-user-15', username: 'space_cadet', name: 'Space Cadet', avatar: 'https://i.pravatar.cc/150?u=mock-user-15', bio: '', followers: 0, following: 0, joinedAt: "2026-04-03T11:00:00.000Z", isPrivate: false }
-    }
-  ], []);
-
-  const MOCK_USERS: User[] = [
-    {
-      id: 'mock-user-1',
-      username: 'driftking',
-      name: 'Drift King',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=driftking',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-2',
-      username: 'ronin',
-      name: 'Ronin',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ronin',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-3',
-      username: 'nightrider',
-      name: 'Night Rider',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=nightrider',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-4',
-      username: 'blademaster',
-      name: 'Blade Master',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=blademaster',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-5',
-      username: 'tokyodreamer',
-      name: 'Tokyo Dreamer',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=tokyodreamer',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-6',
-      username: 'cyber_ninja',
-      name: 'Cyber Ninja',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=cyber_ninja',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-7',
-      username: 'pixel_art',
-      name: 'Pixel Art',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=pixel_art',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-8',
-      username: 'retro_wave',
-      name: 'Retro Wave',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=retro_wave',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-9',
-      username: 'future_bass',
-      name: 'Future Bass',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=future_bass',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-10',
-      username: 'synth_pop',
-      name: 'Synth Pop',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=synth_pop',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-11',
-      username: 'vapor_wave',
-      name: 'Vapor Wave',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=vapor_wave',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-12',
-      username: 'lofi_beats',
-      name: 'Lofi Beats',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=lofi_beats',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-13',
-      username: 'chill_hop',
-      name: 'Chill Hop',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chill_hop',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-14',
-      username: 'ambient_sound',
-      name: 'Ambient Sound',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ambient_sound',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    },
-    {
-      id: 'mock-user-15',
-      username: 'space_cadet',
-      name: 'Space Cadet',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=space_cadet',
-      bio: '', website: '', location: '', joinedAt: "2026-04-03T11:00:00.000Z", followers: 0, following: 0, isTrending: false, isPrivate: false, followRequests: [], blockedUsers: [], feedPreferences: [], onboarded: true
-    }
-  ];
-
   const getAllPosters = () => {
-    const combinedPosters = [...posters, ...MOCK_POSTERS];
-    const combinedUsers = [...allUsers, ...MOCK_USERS];
-    
-    return combinedPosters.map(p => ({
+    return posters.map(p => ({
       ...p,
-      creator: combinedUsers.find(u => u.id === p.creatorId) || combinedUsers[0]
+      creator: allUsers.find(u => u.id === p.creatorId) || allUsers[0]
     })).filter(p => p.creator).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   };
 
@@ -1245,6 +986,56 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  const searchUsersDB = async (queryStr: string): Promise<User[]> => {
+    if (!queryStr || queryStr.trim().length === 0) return [];
+    try {
+      const q = queryStr.toLowerCase().trim().replace('@', '');
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('username', '>=', q),
+        where('username', '<=', q + '\uf8ff'),
+        limit(10)
+      );
+      const snapshot = await getDocs(usersQuery);
+      return snapshot.docs.map(doc => doc.data() as User);
+    } catch (error) {
+      console.error("Error searching users:", error);
+      return [];
+    }
+  };
+
+  const searchPostersDB = async (queryStr: string, searchType?: 'Tags' | 'All' | 'Posters'): Promise<Poster[]> => {
+    if (!queryStr || queryStr.trim().length === 0) return [];
+    try {
+      const q = queryStr.toLowerCase().trim();
+      let postersQuery;
+      
+      if (searchType === 'Tags') {
+          // Because tags might be stored exact, we check array-contains. 
+          // Note: array-contains requires an exact match in the array. 
+          // We will use local fallback for substring matches if needed, but we can query array-contains for exact tags.
+          // Since array-contains doesn't do "starts with" for items inside the array, this will only find exact tags.
+          // For tags we actually rely heavily on local cache fallback. We can just skip DB if tag or use partial.
+          // But to be safe, we'll run a standard limit query and filter.
+          const fallbackQuery = query(collection(db, 'posters'), limit(20));
+          const snapshot = await getDocs(fallbackQuery);
+          return snapshot.docs.map(doc => doc.data() as Poster).filter(p => p.tags && p.tags.some(t => t.toLowerCase().includes(q)));
+      } else {
+          postersQuery = query(
+            collection(db, 'posters'),
+            where('title', '>=', q),
+            where('title', '<=', q + '\uf8ff'),
+            limit(10)
+          );
+          const snapshot = await getDocs(postersQuery);
+          return snapshot.docs.map(doc => doc.data() as Poster);
+      }
+    } catch (error) {
+      console.error("Error searching posters:", error);
+      return [];
+    }
+  };
+
   const updatePassword = async (newPass: string) => {
     if (!auth.currentUser) throw new Error("No authenticated user");
     try {
@@ -1366,13 +1157,14 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   return (
     <GlobalContext.Provider value={{
-      user, isLoading, isDataLoading, login, loginWithEmail, registerWithEmail, logout, updateUserProfile,
+      user, isLoading, isDataLoading, login, loginWithEmail, registerWithEmail, logout, updateUserProfile, resetPassword,
       allUsers, posters, getAllPosters, getFeed, getUserPosters, getUserStats,
       getFollowers, getFollowing, getStories, getConversations, getMessages, getComments,
       addPoster, deletePoster, toggleFollow, isFollowing, isFollowedBy, hasRequestedFollow,
       acceptFollowRequest, declineFollowRequest, cancelFollowRequest, toggleLike, isLiked, getLikeCount,
       toggleSave, isSaved, sendMessage, deleteMessage, addStory, deleteStory, viewStory, addComment,
       updatePassword, togglePrivacy, deleteAccount, blockUser, unblockUser, isBlocked,
+      searchUsersDB, searchPostersDB, checkUsernameExists,
       updateFeedPreferences, notifications, unreadCount, markAsRead,
       likedPosters: likes.filter(l => l.userId === user?.id).map(l => l.posterId),
       savedPosters: saves.filter(s => s.userId === user?.id).map(s => s.posterId),

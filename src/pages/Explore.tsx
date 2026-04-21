@@ -19,7 +19,8 @@ export const Explore: React.FC = () => {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'recommended' | 'latest' | 'trending'>('recommended');
-  const { posters, likedPosters, savedPosters, user, toggleFollow, isFollowing, isDataLoading } = useGlobalContext();
+  const [dbSearchPosters, setDbSearchPosters] = useState<Poster[] | null>(null);
+  const { posters, likedPosters, savedPosters, user, toggleFollow, isFollowing, isDataLoading, searchPostersDB, searchUsersDB } = useGlobalContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,17 +28,6 @@ export const Explore: React.FC = () => {
   const { scrollYProgress } = useScroll({
     offset: ["start start", "end end"]
   });
-
-  // Handle URL query params for direct poster linking
-  useEffect(() => {
-      const params = new URLSearchParams(location.search);
-      const posterId = params.get('poster');
-      if (posterId) {
-          const found = posters.find(p => p.id === posterId);
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          if (found) setSelectedPoster(found);
-      }
-  }, [location.search, posters]);
 
   // Extract unique creators from posters to populate Featured Artists
   const realUsers = useMemo(() => {
@@ -85,11 +75,71 @@ export const Explore: React.FC = () => {
     });
   }, [posters, likedPosters, savedPosters, user]);
 
+  // DB search effect for Explore page
+  useEffect(() => {
+    let active = true;
+    const updateSearch = () => {
+      setDbSearchPosters(null);
+    };
+    if (!searchQuery) {
+      updateSearch();
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const [pResults, uResults] = await Promise.all([
+          searchPostersDB(searchQuery),
+          searchUsersDB(searchQuery)
+        ]);
+        if (active) {
+          // Combine found posters by title with posters made by found users
+          const userIds = new Set(uResults.map(u => u.id));
+          // Unfortunately we can't easily query "posters where creatorId in [...]" if the array is empty,
+          // but we can look for them in our local `posters` cache as a fallback, 
+          // or we can rely on standard local filter combined with the DB fetched items to ensure we don't 'miss' things while still gaining deep DB searching natively.
+          const localMatches = sortedPosters.filter(p => {
+             const q = searchQuery.toLowerCase();
+             return p.title.toLowerCase().includes(q) || 
+                    p.tags.some(t => t.toLowerCase().includes(q)) ||
+                    p.creator?.username.toLowerCase().includes(q) ||
+                    p.creator?.name.toLowerCase().includes(q);
+          });
+          const combined = [...pResults, ...localMatches];
+          const uniqueIds = Array.from(new Set(combined.map(p => p.id)));
+          setDbSearchPosters(uniqueIds.map(id => combined.find(x => x.id === id) as Poster));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, searchPostersDB, searchUsersDB]);
+
+  // Handle URL query params for direct poster linking
+  useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      const posterId = params.get('poster');
+      if (posterId) {
+          const found = posters.find(p => p.id === posterId);
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          if (found) setSelectedPoster(found);
+      }
+  }, [location.search, posters]);
+
+  // Smart Recommendation Algorithm has been moved to the top.
+
   // Filter Logic
   const filteredPosters = useMemo(() => {
-    let result = sortedPosters;
+    let result = dbSearchPosters !== null ? dbSearchPosters : sortedPosters;
     
-    if (searchQuery) {
+    // searchQuery filtering already handled by dbSearchPosters partially, 
+    // but we can leave it or remove it. Since dbSearchPosters combined local filters, we don't strictly need to do it again,
+    // but just in case dbSearchPosters is exactly matched, we skip local text search if dbSearchPosters !== null.
+    if (searchQuery && dbSearchPosters === null) {
       const q = searchQuery.toLowerCase();
       result = result.filter(p => 
         p.title.toLowerCase().includes(q) || 
@@ -118,7 +168,7 @@ export const Explore: React.FC = () => {
     }
     
     return result;
-  }, [sortedPosters, activeTag, sortBy, searchQuery]);
+  }, [sortedPosters, activeTag, sortBy, searchQuery, dbSearchPosters]);
 
   const categories = useMemo(() => {
     const tagCounts: Record<string, number> = {};
@@ -187,7 +237,7 @@ export const Explore: React.FC = () => {
 
   return (
     // ✅ KEY FIX: removed overflow-hidden from root div — it breaks position:sticky in CollageSection
-    <div ref={containerRef} className="min-h-screen bg-cream dark:bg-neutral-900 text-olive-dark dark:text-cream transition-colors duration-300 relative">
+    <div ref={containerRef} className="min-h-screen bg-cream dark:bg-neutral-900 text-olive-dark dark:text-cream transition-colors duration-300 relative pb-20 md:pb-0">
       
       {/* ✅ ContourBackground gets its own overflow-hidden wrapper so it doesn't escape */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -197,10 +247,10 @@ export const Explore: React.FC = () => {
       <Navbar />
 
       {/* 1. HERO SECTION - EDITORIAL SPLIT */}
-      <section className="relative min-h-[90vh] flex flex-col md:flex-row items-stretch justify-between overflow-hidden pt-24 bg-cream dark:bg-neutral-900 border-b border-olive-dark/10 dark:border-white/10">
+      <section className="relative min-h-[90vh] flex flex-col md:flex-row items-stretch justify-between overflow-hidden pt-40 md:pt-48 bg-cream dark:bg-neutral-900 border-b border-olive-dark/10 dark:border-white/10">
         
         {/* Vertical Rail Text (Left) */}
-        <div className="hidden lg:flex w-16 border-r border-olive-dark/10 dark:border-white/10 items-center justify-center py-8">
+        <div className="hidden lg:flex w-16 border-r border-olive-dark/10 dark:border-white/10 items-center justify-center py-8 mt-12 md:mt-0">
             <span className="[writing-mode:vertical-rl] rotate-180 font-mono text-[10px] uppercase tracking-[0.2em] text-olive-dark/40 dark:text-cream/40">
                 Curated Digital Archive • Vol. 01
             </span>
@@ -358,15 +408,27 @@ export const Explore: React.FC = () => {
       {/* 2. TRENDING CREATORS SPOTLIGHT */}
       <section id="trending-section" className="py-16 md:py-32 relative z-10 bg-cream dark:bg-neutral-900 border-t-2 border-olive-dark dark:border-cream transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 md:px-8 mb-12 md:mb-24 flex flex-col md:flex-row items-start md:items-end justify-between gap-8">
-          <div className="flex flex-col">
+          <motion.div 
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="flex flex-col"
+          >
             <span className="text-olive-dark dark:text-neon-lime font-mono text-sm font-bold uppercase tracking-widest mb-4">01 // Trending</span>
             <h2 className="text-5xl sm:text-7xl md:text-9xl font-display font-black text-olive-dark dark:text-cream uppercase tracking-tighter leading-[0.8]">
               Trending
               <br />
               <span className="font-serif italic font-light text-olive-dark/50 dark:text-cream/50">Now</span>
             </h2>
-          </div>
-          <div className="flex flex-col items-start md:items-end gap-6 max-w-sm">
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="flex flex-col items-start md:items-end gap-6 max-w-sm"
+          >
             <p className="text-sm md:text-base font-mono text-olive-dark/70 dark:text-cream/70 uppercase tracking-widest text-left md:text-right">
               The most loved and shared creations from our community this week.
             </p>
@@ -384,7 +446,7 @@ export const Explore: React.FC = () => {
                 className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform"
               />
             </button>
-          </div>
+          </motion.div>
         </div>
 
         {/* Creator Spotlight Carousel */}
@@ -482,14 +544,20 @@ export const Explore: React.FC = () => {
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
 
         <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
-          <div className="flex flex-col mb-16">
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="flex flex-col mb-16"
+          >
             <span className="text-neon-lime font-mono text-sm font-bold uppercase tracking-widest mb-4">02 // Creators</span>
             <h2 className="text-4xl sm:text-7xl md:text-9xl font-display font-black uppercase tracking-tighter leading-[0.8]">
               Featured
               <br />
               <span className="text-transparent" style={{ WebkitTextStroke: '2px #CCFF00' }}>Artists</span>
             </h2>
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center">
             <div className="order-2 lg:order-1">
@@ -505,20 +573,26 @@ export const Explore: React.FC = () => {
                   const showTick = isMe || isFollowingUser;
 
                   return (
-                  <div key={u.id} className="flex items-center justify-between group cursor-pointer p-4 border border-cream/10 hover:border-neon-lime transition-colors bg-cream/5 backdrop-blur-sm">
-                    <div className="flex items-center gap-4">
-                      <span className="font-mono text-neon-lime/50 text-xs">0{i + 1}</span>
+                  <motion.div 
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ duration: 0.5, delay: i * 0.1 }}
+                    key={u.id} className="flex items-center justify-between group cursor-pointer p-3 sm:p-4 border border-cream/10 hover:border-neon-lime transition-colors bg-cream/5 backdrop-blur-sm gap-2"
+                  >
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                      <span className="font-mono text-neon-lime/50 text-xs shrink-0">0{i + 1}</span>
                       <OptimizedImage
                         src={u.avatar}
                         alt={u.username}
-                        className="w-14 h-14 rounded-none grayscale group-hover:grayscale-0 transition-all duration-500 object-cover"
-                        containerClassName="w-14 h-14 shrink-0"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-none grayscale group-hover:grayscale-0 transition-all duration-500 object-cover"
+                        containerClassName="w-12 h-12 sm:w-14 sm:h-14 shrink-0"
                       />
-                      <div>
-                        <h4 className="font-display font-bold uppercase text-base group-hover:text-neon-lime transition-colors tracking-wide">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-display font-bold uppercase text-sm sm:text-base group-hover:text-neon-lime transition-colors tracking-wide truncate">
                           {u.name}
                         </h4>
-                        <p className="text-xs font-mono text-cream/50">@{u.username}</p>
+                        <p className="text-[10px] sm:text-xs font-mono text-cream/50 truncate">@{u.username}</p>
                       </div>
                     </div>
                     <button 
@@ -532,7 +606,7 @@ export const Explore: React.FC = () => {
                           navigate('/login');
                         }
                       }}
-                      className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${
+                      className={`w-10 h-10 shrink-0 rounded-full border flex items-center justify-center transition-all ${
                         showTick
                           ? 'bg-white/10 border-white/20 text-white hover:bg-red-500/20 hover:text-red-500 hover:border-red-500/50'
                           : 'border-cream/20 group-hover:bg-neon-lime group-hover:text-olive-dark group-hover:border-neon-lime'
@@ -540,7 +614,7 @@ export const Explore: React.FC = () => {
                     >
                       {showTick ? <Check size={16} /> : <Plus size={16} />}
                     </button>
-                  </div>
+                  </motion.div>
                 )})}
               </div>
               
@@ -560,9 +634,10 @@ export const Explore: React.FC = () => {
                 {[...posters.slice(0, 4), ...Array(Math.max(0, 4 - posters.length)).fill(null)].slice(0, 4).map((p, i) => (
                   <motion.div
                     key={p?.id || `fallback-${i}`}
-                    initial={{ opacity: 0, scale: 0.9 }}
+                    initial={{ opacity: 0, scale: 0.95 }}
                     whileInView={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.1, duration: 0.5 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ delay: i * 0.1, duration: 0.6, ease: [0.25, 0.1, 0.25, 1.0] }}
                     className={`relative overflow-hidden border border-cream/20 ${
                       i === 0 ? 'col-span-1 sm:col-span-2 sm:row-span-2 h-full' : 'col-span-1 h-full hidden sm:block'
                     }`}
@@ -588,7 +663,11 @@ export const Explore: React.FC = () => {
       <section className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 min-h-[60vh] md:h-[80vh]">
           {/* Left: On Track */}
-          <div
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
             onClick={() => setActiveTag('3D')}
             className="bg-cream dark:bg-neutral-900 relative flex flex-col items-center justify-center text-center group overflow-hidden cursor-pointer border-r border-olive-dark/10 dark:border-white/10 py-16 md:py-0"
           >
@@ -607,10 +686,14 @@ export const Explore: React.FC = () => {
             <div className="absolute bottom-6 left-6 md:bottom-12 md:left-12 w-12 h-12 md:w-16 md:h-16 border border-olive-dark dark:border-cream flex items-center justify-center rounded-full group-hover:rotate-45 transition-transform duration-500 z-10 group-hover:border-olive-dark">
               <Zap size={20} className="text-olive-dark dark:text-cream group-hover:text-olive-dark md:w-6 md:h-6" />
             </div>
-          </div>
+          </motion.div>
 
           {/* Right: Off Track */}
-          <div
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
             onClick={() => setActiveTag('Abstract')}
             className="bg-olive-dark dark:bg-black relative flex flex-col items-center justify-center text-center group overflow-hidden cursor-pointer py-16 md:py-0"
           >
@@ -629,13 +712,19 @@ export const Explore: React.FC = () => {
             <div className="absolute bottom-6 right-6 md:bottom-12 md:right-12 w-12 h-12 md:w-16 md:h-16 border border-cream group-hover:border-olive-dark flex items-center justify-center rounded-full group-hover:-rotate-45 transition-transform duration-500 z-10">
               <Layers size={20} className="text-cream group-hover:text-olive-dark transition-colors md:w-6 md:h-6" />
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* 6. MAIN FEED WITH FILTERS */}
       <section id="main-feed" className="py-16 max-w-7xl mx-auto px-4 md:px-8 relative z-10">
-        <div className="flex flex-col gap-8 mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="flex flex-col gap-8 mb-12"
+        >
           {/* Top Row: Search and Sort */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-4 w-full md:w-auto">
@@ -753,7 +842,7 @@ export const Explore: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
           <div className="lg:col-span-3 min-h-[400px]">
@@ -768,7 +857,12 @@ export const Explore: React.FC = () => {
           {/* Sidebar */}
           <div className="hidden lg:block lg:col-span-1 space-y-12 sticky top-24 h-fit">
             {/* Trending Tags List */}
-            <div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5 }}
+            >
               <h3 className="text-xs font-bold font-mono text-olive-dark/40 dark:text-cream/40 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Zap size={12} /> Trending Topics
               </h3>
@@ -790,10 +884,15 @@ export const Explore: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Sidebar Posters - "Staff Picks" */}
-            <div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
               <h3 className="text-xs font-bold font-mono text-olive-dark/40 dark:text-cream/40 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Sparkles size={12} /> Staff Picks
               </h3>
@@ -817,10 +916,15 @@ export const Explore: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Community Favorites */}
-            <div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
               <h3 className="text-xs font-bold font-mono text-olive-dark/40 dark:text-cream/40 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <Layers size={12} /> Community Favorites
               </h3>
@@ -843,10 +947,16 @@ export const Explore: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Footer Links */}
-            <div className="pt-8 border-t border-olive-dark/10 dark:border-white/10">
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="pt-8 border-t border-olive-dark/10 dark:border-white/10"
+            >
               <div className="flex flex-wrap gap-x-6 gap-y-2 mb-6">
                 {(['About', 'Manifesto', 'Terms', 'Privacy'] as InfoType[]).map(link => (
                   <button 
@@ -863,7 +973,7 @@ export const Explore: React.FC = () => {
                 <br />
                 DESIGNED FOR THE VISIONARIES.
               </p>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>

@@ -13,7 +13,7 @@ interface EditProfileModalProps {
 }
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose }) => {
-    const { user, updateUserProfile } = useGlobalContext();
+    const { user, updateUserProfile, checkUsernameExists } = useGlobalContext();
     const [name, setName] = useState('');
     const [username, setUsername] = useState('');
     const [bio, setBio] = useState('');
@@ -22,7 +22,40 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
     const [avatar, setAvatar] = useState('');
     const [banner, setBanner] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    
+    const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+    const [usernameError, setUsernameError] = useState<string | null>(null);
+
+    const checkTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+
+    useEffect(() => {
+        const cleanUsername = username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+        if (!cleanUsername || (user && cleanUsername === user.username)) {
+            setUsernameError(null);
+            return;
+        }
+
+        setIsCheckingUsername(true);
+        setUsernameError(null);
+        clearTimeout(checkTimeoutRef.current);
+
+        checkTimeoutRef.current = setTimeout(async () => {
+            try {
+                const exists = await checkUsernameExists(cleanUsername, user?.id);
+                if (exists) {
+                    setUsernameError('Username is already taken');
+                } else {
+                    setUsernameError(null);
+                }
+            } catch (err) {
+                setUsernameError('Error checking username');
+            } finally {
+                setIsCheckingUsername(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(checkTimeoutRef.current);
+    }, [username, user, checkUsernameExists]);
+
     // Image Editing State
     const [editingImage, setEditingImage] = useState<{
         src: string;
@@ -88,8 +121,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
         e.preventDefault();
         setIsLoading(true);
         try {
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
             await updateUserProfile({ 
                 name, 
                 username: username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase(), 
@@ -99,9 +130,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                 avatar, 
                 bannerUrl: banner 
             });
+            toast.success("Profile updated!");
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
+            toast.error(error.message || "Failed to update profile");
         } finally {
             setIsLoading(false);
         }
@@ -172,15 +205,27 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
                                 <div className="space-y-4">
                                     <div>
                                         <label className="text-xs font-bold text-cream/60 uppercase tracking-widest block mb-2">Username</label>
-                                        <input 
-                                            type="text" 
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
-                                            maxLength={30}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-cream focus:border-neon-lime outline-none font-medium"
-                                            placeholder="username"
-                                            required
-                                        />
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                value={username}
+                                                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())}
+                                                maxLength={30}
+                                                className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-cream outline-none font-medium transition-colors ${
+                                                    usernameError ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-neon-lime'
+                                                }`}
+                                                placeholder="username"
+                                                required
+                                            />
+                                            {isCheckingUsername && (
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white/60 rounded-full animate-spin" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        {usernameError && (
+                                            <p className="text-red-500 text-xs font-bold mt-2">{usernameError}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-cream/60 uppercase tracking-widest block mb-2">Display Name</label>
@@ -233,7 +278,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
 
                                 <button 
                                     type="submit"
-                                    disabled={isLoading}
+                                    disabled={isLoading || !!usernameError || isCheckingUsername}
                                     className="w-full py-4 bg-neon-lime text-olive-dark font-black uppercase tracking-widest rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-[0_0_20px_rgba(204,255,0,0.2)] hover:shadow-[0_0_30px_rgba(204,255,0,0.4)]"
                                 >
                                     {isLoading ? <Loader2 className="animate-spin" /> : 'Save Changes'}

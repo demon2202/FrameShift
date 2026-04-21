@@ -37,7 +37,7 @@ const BlockedUserItem: React.FC<{ userId: string }> = ({ userId }) => {
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { user, updatePassword, togglePrivacy, deleteAccount, theme, toggleTheme, updateFeedPreferences, updateUserProfile } = useGlobalContext();
+  const { user, updatePassword, togglePrivacy, deleteAccount, theme, toggleTheme, updateFeedPreferences, updateUserProfile, checkUsernameExists } = useGlobalContext();
   const [activeTab, setActiveTab] = useState<'account' | 'privacy' | 'notifications' | 'appearance' | 'feed'>('account');
   
   // Password State
@@ -49,6 +49,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [username, setUsername] = useState(user?.username || '');
   const [name, setName] = useState(user?.name || '');
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+
+  const checkTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+
+  React.useEffect(() => {
+    if (user) {
+      setUsername(user.username || '');
+      setName(user.name || '');
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    const cleanUsername = username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+    if (!cleanUsername || (user && cleanUsername === user.username)) {
+      setUsernameError(null);
+      return;
+    }
+
+    setIsCheckingUsername(true);
+    setUsernameError(null);
+    clearTimeout(checkTimeoutRef.current);
+
+    checkTimeoutRef.current = setTimeout(async () => {
+      try {
+        const _user = user as any;
+        const exists = await checkUsernameExists(cleanUsername, _user?.id);
+        if (exists) {
+          setUsernameError('Username is already taken');
+        } else {
+          setUsernameError(null);
+        }
+      } catch (err) {
+        setUsernameError('Error checking username');
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(checkTimeoutRef.current);
+  }, [username, user, checkUsernameExists]);
 
   // Mock States
   // const [emailNotifs, setEmailNotifs] = useState(true);
@@ -64,9 +105,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   const handleToggleNotification = async (key: keyof typeof notifs) => {
       if (!user) return;
+      const currentPrefs = user.notificationPreferences || { 
+          email: true, 
+          push: true, 
+          likesAndComments: true, 
+          newFollowers: true, 
+          directMessages: true 
+      };
+      
       await updateUserProfile({
           notificationPreferences: {
-              ...(user.notificationPreferences || { email: true, push: true }),
+              ...currentPrefs,
               [key]: !notifs[key]
           }
       });
@@ -108,21 +157,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         setNewPassword('');
         setConfirmPassword('');
     } catch (error: any) {
-        setMessage({ type: 'error', text: error.message || "Failed to update password" });
+        if (error.code === 'auth/requires-recent-login') {
+            setMessage({ type: 'error', text: "Please log out and log back in to update your password." });
+        } else {
+            setMessage({ type: 'error', text: error.message || "Failed to update password" });
+        }
     }
   };
 
   const handleProfileChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !name.trim()) {
+    const cleanUsername = username.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+    
+    if (!cleanUsername || !name.trim()) {
         setProfileMessage({ type: 'error', text: "Name and Username are required" });
         return;
     }
     try {
         await updateUserProfile({
-            username: username.trim(),
+            username: cleanUsername,
             name: name.trim()
         });
+        setUsername(cleanUsername);
         setProfileMessage({ type: 'success', text: "Profile updated successfully" });
     } catch (error: any) {
         setProfileMessage({ type: 'error', text: error.message || "Failed to update profile" });
@@ -249,12 +305,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-olive-dark dark:text-cream uppercase tracking-widest mb-2">Username</label>
-                            <input 
-                                type="text" 
-                                value={username}
-                                onChange={(e) => { setProfileMessage(null); setUsername(e.target.value); }}
-                                className="w-full bg-cream dark:bg-white/5 border border-olive-dark/10 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-olive-dark/30 dark:focus:border-white/30 text-olive-dark dark:text-cream transition-colors"
-                            />
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    value={username}
+                                    onChange={(e) => { 
+                                        setProfileMessage(null); 
+                                        setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()); 
+                                    }}
+                                    className={`w-full bg-cream dark:bg-white/5 border rounded-xl px-4 py-3 outline-none transition-colors text-olive-dark dark:text-cream ${
+                                        usernameError 
+                                            ? 'border-red-500 focus:border-red-500' 
+                                            : 'border-olive-dark/10 dark:border-white/10 focus:border-olive-dark/30 dark:focus:border-white/30'
+                                    }`}
+                                />
+                                {isCheckingUsername && (
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                        <div className="w-4 h-4 border-2 border-olive-dark/30 border-t-olive-dark/60 rounded-full animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+                            {usernameError && (
+                                <p className="text-red-500 text-xs font-bold mt-2">{usernameError}</p>
+                            )}
                         </div>
 
                         {profileMessage && (
@@ -265,7 +338,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
                         <button 
                             type="submit"
-                            className="px-8 py-3 bg-olive-dark text-neon-lime font-bold text-xs uppercase tracking-widest rounded-full hover:bg-olive-dark/90 transition-all shadow-lg"
+                            disabled={!username.trim() || !name.trim() || !!usernameError || isCheckingUsername}
+                            className="px-8 py-3 bg-olive-dark text-neon-lime font-bold text-xs uppercase tracking-widest rounded-full hover:bg-olive-dark/90 transition-all shadow-lg disabled:opacity-50"
                         >
                             Update Profile
                         </button>
@@ -316,10 +390,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                         <h3 className="text-xl font-bold text-red-500 uppercase tracking-tight mb-2">Danger Zone</h3>
                         <p className="text-sm text-red-500/60 mb-4">Once you delete your account, there is no going back. Please be certain.</p>
                         <button 
-                            onClick={() => {
+                            onClick={async () => {
                                 if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-                                    deleteAccount();
-                                    onClose();
+                                    try {
+                                        await deleteAccount();
+                                        onClose();
+                                    } catch(err: any) {
+                                        alert("Failed to delete account. You may need to log out and log back in to verify your identity. Error: " + err.message);
+                                    }
                                 }
                             }}
                             className="px-6 py-3 bg-red-500/10 text-red-500 font-bold text-xs uppercase tracking-widest rounded-full hover:bg-red-500 hover:text-white transition-all border border-red-500/20"

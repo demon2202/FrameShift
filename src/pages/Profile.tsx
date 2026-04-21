@@ -112,7 +112,7 @@ export const Profile: React.FC = () => {
       </div>
       <Navbar />
       
-      <div className="max-w-5xl mx-auto px-4 md:px-8 relative z-10">
+      <div className="max-w-5xl mx-auto px-4 md:px-8 relative z-10 pb-20 md:pb-0">
         {/* Banner Image */}
         <div className="w-full h-48 md:h-72 rounded-3xl overflow-hidden mb-8 relative border border-olive-dark/10 dark:border-white/10 group shadow-2xl">
             <OptimizedImage 

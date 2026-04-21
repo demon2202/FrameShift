@@ -730,196 +730,205 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
 
                             {/* Image Overlays - Draggable */}
                             {storyOverlays.map((overlay) => (
-                                <motion.div 
-                                    key={overlay.id}
-                                    drag
-                                    dragMomentum={false}
-                                    dragConstraints={previewRef}
-                                    onDragEnd={(e, info) => {
-                                        if (previewRef.current) {
-                                            const rect = previewRef.current.getBoundingClientRect();
-                                            // Calculate new position based on pointer, clamped to 0-1
-                                            const rawX = (info.point.x - rect.left) / rect.width;
-                                            const rawY = (info.point.y - rect.top) / rect.height;
-                                            const x = Math.max(0, Math.min(1, rawX));
-                                            const y = Math.max(0, Math.min(1, rawY));
-                                            setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, x, y } : o));
-                                        }
-                                    }}
-                                    onClick={(e) => { e.stopPropagation(); setActiveOverlayId(overlay.id); setActiveTextId(null); setActiveEmojiId(null); }}
-                                    className={`absolute cursor-move group ${activeOverlayId === overlay.id ? 'ring-2 ring-neon-lime' : ''}`}
-                                    style={{ 
-                                        left: `${overlay.x * 100}%`, 
-                                        top: `${overlay.y * 100}%`,
-                                        x: '-50%',
-                                        y: '-50%',
-                                        width: `${overlay.scale * 100}%`,
-                                        rotate: overlay.rotation
-                                    }}
+                                <div 
+                                    key={overlay.id} 
+                                    className="absolute w-0 h-0 flex items-center justify-center z-20"
+                                    style={{ left: `${overlay.x * 100}%`, top: `${overlay.y * 100}%` }}
                                 >
-                                    <OptimizedImage src={overlay.src} className="w-full h-auto pointer-events-none drop-shadow-lg" containerClassName="w-full h-auto" alt="Overlay" />
-                                    
-                                    {/* Controls for Overlay (Only when active) */}
-                                    {activeOverlayId === overlay.id && (
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 flex gap-2 bg-black/50 rounded-full px-2 py-1">
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, scale: Math.max(0.1, o.scale - 0.05) } : o));
-                                                }}
-                                                className="text-white hover:text-neon-lime text-xs font-bold"
-                                            >-</button>
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, scale: Math.min(1, o.scale + 0.05) } : o));
-                                                }}
-                                                className="text-white hover:text-neon-lime text-xs font-bold"
-                                            >+</button>
-                                            <div className="w-px h-3 bg-white/20 self-center" />
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, rotation: (o.rotation + 15) % 360 } : o));
-                                                }}
-                                                className="text-white hover:text-neon-lime"
-                                                title="Rotate"
-                                            >
-                                                <RotateCw size={12} />
-                                            </button>
-                                            <div className="w-px h-3 bg-white/20 self-center" />
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryOverlays(prev => prev.filter(o => o.id !== overlay.id));
-                                                    setActiveOverlayId(null);
-                                                }}
-                                                className="text-red-400 hover:text-red-300"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </motion.div>
+                                    <motion.div 
+                                        drag
+                                        dragMomentum={false}
+                                        dragConstraints={previewRef}
+                                        onDragEnd={(e, info) => {
+                                            if (previewRef.current) {
+                                                const rect = previewRef.current.getBoundingClientRect();
+                                                const rawX = (info.point.x - rect.left) / rect.width;
+                                                const rawY = (info.point.y - rect.top) / rect.height;
+                                                const x = Math.max(0, Math.min(1, rawX));
+                                                const y = Math.max(0, Math.min(1, rawY));
+                                                setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, x, y } : o));
+                                            }
+                                        }}
+                                        onClick={(e) => { e.stopPropagation(); setActiveOverlayId(overlay.id); setActiveTextId(null); setActiveEmojiId(null); }}
+                                        className={`cursor-move group ${activeOverlayId === overlay.id ? 'ring-2 ring-neon-lime rounded-lg' : ''}`}
+                                        style={{ 
+                                            width: `${overlay.scale * 300}px`, // Ensure natural scale sizing mapping to explicit px bounds for easy dragging
+                                            rotate: overlay.rotation,
+                                            x: 0,
+                                            y: 0 
+                                        }}
+                                    >
+                                        <OptimizedImage src={overlay.src} className="w-full h-auto pointer-events-none drop-shadow-lg" containerClassName="w-full h-auto" alt="Overlay" />
+                                        
+                                        {/* Controls for Overlay (Only when active) */}
+                                        {activeOverlayId === overlay.id && (
+                                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 bg-black/80 rounded-full px-3 py-2 z-50 shadow-2xl backdrop-blur-md">
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, scale: Math.max(0.1, o.scale - 0.05) } : o));
+                                                    }}
+                                                    className="text-white hover:text-neon-lime text-xs font-bold"
+                                                >-</button>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, scale: Math.min(2, o.scale + 0.05) } : o));
+                                                    }}
+                                                    className="text-white hover:text-neon-lime text-xs font-bold"
+                                                >+</button>
+                                                <div className="w-px h-3 bg-white/20 self-center" />
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryOverlays(prev => prev.map(o => o.id === overlay.id ? { ...o, rotation: (o.rotation + 15) % 360 } : o));
+                                                    }}
+                                                    className="text-white hover:text-neon-lime"
+                                                    title="Rotate"
+                                                >
+                                                    <RotateCw size={14} />
+                                                </button>
+                                                <div className="w-px h-3 bg-white/20 self-center" />
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryOverlays(prev => prev.filter(o => o.id !== overlay.id));
+                                                        setActiveOverlayId(null);
+                                                    }}
+                                                    className="text-red-400 hover:text-red-300"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                </div>
                             ))}
 
-                            {/* Overlays - Draggable */}
+                            {/* Texts - Draggable */}
                             {storyTexts.map((textObj) => (
-                                <motion.div 
-                                    key={textObj.id}
-                                    drag
-                                    dragMomentum={false}
-                                    dragConstraints={previewRef}
-                                    onDragEnd={(e, info) => {
-                                        if (previewRef.current) {
-                                            const rect = previewRef.current.getBoundingClientRect();
-                                            const rawX = (info.point.x - rect.left) / rect.width;
-                                            const rawY = (info.point.y - rect.top) / rect.height;
-                                            const x = Math.max(0, Math.min(1, rawX));
-                                            const y = Math.max(0, Math.min(1, rawY));
-                                            setStoryTexts(prev => prev.map(t => t.id === textObj.id ? { ...t, x, y } : t));
-                                        }
-                                    }}
-                                    onClick={(e) => { e.stopPropagation(); setActiveTextId(textObj.id); setCurrentInputText(textObj.text); setCurrentAnimation(textObj.animation as any); setActiveOverlayId(null); setActiveEmojiId(null); }}
-                                    className={`absolute cursor-move flex items-center justify-center ${
-                                        textObj.animation === 'pulse' ? 'animate-pulse' : 
-                                        textObj.animation === 'bounce' ? 'animate-bounce' : 
-                                        textObj.animation === 'spin' ? 'animate-spin' : 
-                                        textObj.animation === 'wiggle' ? 'animate-wiggle' :
-                                        textObj.animation === 'float' ? 'animate-float' : ''
-                                    } ${activeTextId === textObj.id ? 'ring-2 ring-neon-lime' : ''}`}
-                                    style={{ 
-                                        left: `${textObj.x * 100}%`, 
-                                        top: `${textObj.y * 100}%`,
-                                        x: '-50%',
-                                        y: '-50%',
-                                        scale: textObj.scale,
-                                        rotate: `${textObj.rotation}deg`
-                                    }}
+                                <div 
+                                    key={textObj.id} 
+                                    className="absolute w-0 h-0 flex items-center justify-center z-30"
+                                    style={{ left: `${textObj.x * 100}%`, top: `${textObj.y * 100}%` }}
                                 >
-                                    <span className="text-3xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] uppercase font-display text-center px-4 break-words max-w-full select-none">
-                                        {textObj.text}
-                                    </span>
-                                </motion.div>
+                                    <motion.div 
+                                        drag
+                                        dragMomentum={false}
+                                        dragConstraints={previewRef}
+                                        onDragEnd={(e, info) => {
+                                            if (previewRef.current) {
+                                                const rect = previewRef.current.getBoundingClientRect();
+                                                const rawX = (info.point.x - rect.left) / rect.width;
+                                                const rawY = (info.point.y - rect.top) / rect.height;
+                                                const x = Math.max(0, Math.min(1, rawX));
+                                                const y = Math.max(0, Math.min(1, rawY));
+                                                setStoryTexts(prev => prev.map(t => t.id === textObj.id ? { ...t, x, y } : t));
+                                            }
+                                        }}
+                                        onClick={(e) => { e.stopPropagation(); setActiveTextId(textObj.id); setCurrentInputText(textObj.text); setCurrentAnimation(textObj.animation as any); setActiveOverlayId(null); setActiveEmojiId(null); }}
+                                        className={`cursor-move flex items-center justify-center ${activeTextId === textObj.id ? 'ring-2 ring-neon-lime rounded-lg' : ''}`}
+                                        animate={{
+                                            scale: textObj.scale,
+                                            rotate: textObj.rotation,
+                                            x: 0,
+                                            y: 0,
+                                            ...(textObj.animation === 'pulse' ? { scale: [textObj.scale, textObj.scale * 1.1, textObj.scale] } : {}),
+                                            ...(textObj.animation === 'bounce' ? { y: [0, -20, 0] } : {}),
+                                            ...(textObj.animation === 'spin' ? { rotate: [textObj.rotation, textObj.rotation + 360] } : {}),
+                                        }}
+                                        transition={{
+                                            ...(textObj.animation !== 'none' ? { repeat: Infinity, duration: 1.5 } : { duration: 0 })
+                                        }}
+                                    >
+                                        <span className="text-3xl font-black drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] uppercase font-display text-center px-4 break-words max-w-full select-none" style={{ color: textObj.color || 'white' }}>
+                                            {textObj.text}
+                                        </span>
+                                    </motion.div>
+                                </div>
                             ))}
                             
+                            {/* Emojis - Draggable */}
                             {storyEmojis.map((emojiObj) => (
-                                <motion.div 
-                                    key={emojiObj.id}
-                                    drag
-                                    dragMomentum={false}
-                                    dragConstraints={previewRef}
-                                    onDragEnd={(e, info) => {
-                                        if (previewRef.current) {
-                                            const rect = previewRef.current.getBoundingClientRect();
-                                            const rawX = (info.point.x - rect.left) / rect.width;
-                                            const rawY = (info.point.y - rect.top) / rect.height;
-                                            const x = Math.max(0, Math.min(1, rawX));
-                                            const y = Math.max(0, Math.min(1, rawY));
-                                            setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, x, y } : e));
-                                        }
-                                    }}
-                                    onClick={(e) => { e.stopPropagation(); setActiveEmojiId(emojiObj.id); setActiveTextId(null); setActiveOverlayId(null); }}
-                                    className={`absolute cursor-move text-6xl select-none group ${
-                                        emojiObj.animation === 'pulse' ? 'animate-pulse' : 
-                                        emojiObj.animation === 'bounce' ? 'animate-bounce' : 
-                                        emojiObj.animation === 'spin' ? 'animate-spin' : 
-                                        emojiObj.animation === 'wiggle' ? 'animate-wiggle' :
-                                        emojiObj.animation === 'float' ? 'animate-float' : ''
-                                    } ${activeEmojiId === emojiObj.id ? 'ring-2 ring-neon-lime rounded-lg' : ''}`}
-                                    style={{ 
-                                        left: `${emojiObj.x * 100}%`, 
-                                        top: `${emojiObj.y * 100}%`,
-                                        x: '-50%',
-                                        y: '-50%',
-                                        scale: emojiObj.scale,
-                                        rotate: `${emojiObj.rotation}deg`
-                                    }}
+                                <div 
+                                    key={emojiObj.id} 
+                                    className="absolute w-0 h-0 flex items-center justify-center z-40"
+                                    style={{ left: `${emojiObj.x * 100}%`, top: `${emojiObj.y * 100}%` }}
                                 >
-                                    {emojiObj.char}
-                                    
-                                    {/* Edit Controls for Emoji */}
-                                    {activeEmojiId === emojiObj.id && (
-                                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex gap-2 bg-black/50 rounded-full px-2 py-1 z-50">
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, scale: Math.max(0.5, e.scale - 0.2) } : e));
-                                                }}
-                                                className="text-white hover:text-neon-lime text-xs font-bold"
-                                            >-</button>
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, scale: Math.min(3, e.scale + 0.2) } : e));
-                                                }}
-                                                className="text-white hover:text-neon-lime text-xs font-bold"
-                                            >+</button>
-                                            <div className="w-px h-3 bg-white/20 self-center" />
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, rotation: (e.rotation + 15) % 360 } : e));
-                                                }}
-                                                className="text-white hover:text-neon-lime"
-                                                title="Rotate"
-                                            >
-                                                <RotateCw size={12} />
-                                            </button>
-                                            <div className="w-px h-3 bg-white/20 self-center" />
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setStoryEmojis(prev => prev.filter(e => e.id !== emojiObj.id));
-                                                    setActiveEmojiId(null);
-                                                }}
-                                                className="text-red-400 hover:text-red-300"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </motion.div>
+                                    <motion.div 
+                                        drag
+                                        dragMomentum={false}
+                                        dragConstraints={previewRef}
+                                        onDragEnd={(e, info) => {
+                                            if (previewRef.current) {
+                                                const rect = previewRef.current.getBoundingClientRect();
+                                                const rawX = (info.point.x - rect.left) / rect.width;
+                                                const rawY = (info.point.y - rect.top) / rect.height;
+                                                const x = Math.max(0, Math.min(1, rawX));
+                                                const y = Math.max(0, Math.min(1, rawY));
+                                                setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, x, y } : e));
+                                            }
+                                        }}
+                                        onClick={(e) => { e.stopPropagation(); setActiveEmojiId(emojiObj.id); setActiveTextId(null); setActiveOverlayId(null); }}
+                                        className={`cursor-move text-6xl select-none group ${activeEmojiId === emojiObj.id ? 'ring-2 ring-neon-lime rounded-lg' : ''}`}
+                                        animate={{
+                                            scale: emojiObj.scale,
+                                            rotate: emojiObj.rotation,
+                                            x: 0,
+                                            y: 0,
+                                            ...(emojiObj.animation === 'pulse' ? { scale: [emojiObj.scale, emojiObj.scale * 1.1, emojiObj.scale] } : {}),
+                                            ...(emojiObj.animation === 'bounce' ? { y: [0, -20, 0] } : {}),
+                                            ...(emojiObj.animation === 'spin' ? { rotate: [emojiObj.rotation, emojiObj.rotation + 360] } : {}),
+                                        }}
+                                        transition={{
+                                            ...(emojiObj.animation !== 'none' ? { repeat: Infinity, duration: 1.5 } : { duration: 0 })
+                                        }}
+                                    >
+                                        {emojiObj.char}
+                                        
+                                        {/* Edit Controls for Emoji */}
+                                        {activeEmojiId === emojiObj.id && (
+                                            <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex gap-2 bg-black/80 rounded-full px-3 py-2 z-50 shadow-2xl backdrop-blur-md">
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, scale: Math.max(0.5, e.scale - 0.2) } : e));
+                                                    }}
+                                                    className="text-white hover:text-neon-lime text-xs font-bold"
+                                                >-</button>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, scale: Math.min(3, e.scale + 0.2) } : e));
+                                                    }}
+                                                    className="text-white hover:text-neon-lime text-xs font-bold"
+                                                >+</button>
+                                                <div className="w-px h-3 bg-white/20 self-center" />
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryEmojis(prev => prev.map(e => e.id === emojiObj.id ? { ...e, rotation: (e.rotation + 15) % 360 } : e));
+                                                    }}
+                                                    className="text-white hover:text-neon-lime"
+                                                    title="Rotate"
+                                                >
+                                                    <RotateCw size={14} />
+                                                </button>
+                                                <div className="w-px h-3 bg-white/20 self-center" />
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setStoryEmojis(prev => prev.filter(e => e.id !== emojiObj.id));
+                                                        setActiveEmojiId(null);
+                                                    }}
+                                                    className="text-red-400 hover:text-red-300"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                </div>
                             ))}
                             
                             {selectedGif && (
@@ -1128,6 +1137,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                                                 >
                                                     {anim}
                                                 </button>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-2 flex-wrap mt-2">
+                                            {['white', 'black', '#ccff00', '#ff0055', '#00e5ff'].map(color => (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => setStoryTexts(prev => prev.map(t => t.id === activeTextId ? { ...t, color } : t))}
+                                                    className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${storyTexts.find(t => t.id === activeTextId)?.color === color ? 'scale-110 border-white' : 'border-white/20'}`}
+                                                    style={{ backgroundColor: color }}
+                                                />
                                             ))}
                                         </div>
                                     </motion.div>
