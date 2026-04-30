@@ -195,9 +195,25 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   useEffect(() => {
+    if (!auth) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Safety timeout: Ensure loading state is cleared after 10 seconds regardless of auth
+    const authTimeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 10000);
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(authTimeout);
       if (firebaseUser) {
         try {
+          if (!db) {
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             setUser(userDoc.data() as User);
@@ -220,7 +236,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               bio: '',
               website: '',
               location: '',
-              joinedAt: "2026-04-03T11:00:00.000Z",
+              joinedAt: new Date().toISOString(),
               followers: 0,
               following: 0,
               isTrending: false,
@@ -234,22 +250,29 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
               setUser(newUser);
             } catch (error) {
-              handleFirestoreError(error, OperationType.CREATE, 'users');
+              console.error("Error creating user:", error);
             }
           }
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, 'users');
+          console.error("Error fetching user doc:", error);
         }
       } else {
         setUser(null);
       }
       setIsLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      clearTimeout(authTimeout);
+    };
   }, []);
 
   // Global Listeners
   useEffect(() => {
+    if (!db) {
+      setIsDataLoading(false);
+      return;
+    }
     const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(500)), (snapshot) => {
       const usersData = snapshot.docs.map(doc => doc.data() as User);
       setAllUsers(usersData);

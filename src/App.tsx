@@ -135,15 +135,30 @@ const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const AppContent: React.FC = () => {
   const { isLoading } = useGlobalContext();
   const [minTimePassed, setMinTimePassed] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimePassed(true);
     }, 2500); // 2.5 seconds minimum loading time
-    return () => clearTimeout(timer);
+
+    const safetyTimer = setTimeout(() => {
+      setIsReady(true);
+    }, 8000); // 8 seconds absolute maximum loading time
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
-  const showLoading = isLoading || !minTimePassed;
+  useEffect(() => {
+    if (!isLoading && minTimePassed) {
+      setIsReady(true);
+    }
+  }, [isLoading, minTimePassed]);
+
+  const showLoading = !isReady;
 
   return (
     <AnimatePresence mode="wait">

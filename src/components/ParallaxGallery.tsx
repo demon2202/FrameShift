@@ -93,7 +93,6 @@ export const ParallaxGallery: React.FC = () => {
                     </h2>
                     <div className="mt-8">
                         <span className="block font-handwriting text-3xl sm:text-4xl md:text-5xl text-[#CCFF00] font-cursive mb-2" style={{ fontFamily: 'cursive' }}>Steve Jobs</span>
-                        <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-[#F0EDE6]/60">Visionary Archive</span>
                     </div>
                 </div>
             </div>
