@@ -4,11 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@theme {
-  --font-comic: "Permanent Marker", cursive;
-  --font-impact: "Bangers", cursive;
-  --font-playful: "Luckiest Guy", cursive;
-}
+/* ↓ @theme is Tailwind v4 only — removed. Font utilities moved to @layer utilities below. */
 
 body {
   @apply bg-cream text-olive-dark dark:bg-olive-dark dark:text-cream;
@@ -107,14 +103,15 @@ body {
 }
 
 @layer utilities {
-  .text-comic { font-family: "Permanent Marker", cursive; }
-  .text-impact { font-family: "Bangers", cursive; }
+  /* Font utilities — replaces the invalid @theme block */
+  .text-comic   { font-family: "Permanent Marker", cursive; }
+  .text-impact  { font-family: "Bangers", cursive; }
   .text-playful { font-family: "Luckiest Guy", cursive; }
 
   .text-shadow-sm {
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   }
-  
+
   .text-stroke-lime {
     -webkit-text-stroke: 1px #c8f135;
     color: transparent;
