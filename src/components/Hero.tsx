@@ -89,9 +89,7 @@ export const Hero: React.FC = () => {
                     ))}
                 </div>
 
-                <div className="rotate-[-90deg] whitespace-nowrap">
-                    <span className="cinematic-text text-white/20 text-[8px] font-bold tracking-[0.4em]">STABLE_CORE</span>
-                </div>
+               
             </div>
 
             {/* 3. LAYER: TOP NAVIGATION */}
@@ -191,11 +189,6 @@ export const Hero: React.FC = () => {
                         <p className="mt-12 font-comic text-black/60 text-2xl uppercase tracking-widest">Join the Vanguard</p>
                     </div>
                 </div>
-            </div>
-
-            {/* 5. LAYER: FOOTER */}
-            <div className="absolute bottom-0 left-24 right-0 h-16 flex items-center justify-between px-12 z-40 bg-gradient-to-t from-black/50 to-transparent">
-                <span className="cinematic-text text-white/20 text-[8px] font-bold tracking-[0.2em]">P.VERSE_SYSTEM_V1.0</span>
             </div>
         </div>
     );
