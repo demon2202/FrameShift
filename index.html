@@ -7,16 +7,25 @@
     <meta name="description" content="A social-first creative platform where designers publish poster artwork, follow other creators, and discover visual inspiration." />
     <meta name="theme-color" content="#CCFF00" />
     <script>
-      // Clear persistent Service Workers that cause stale asset 404s
+      // Unregister any stale service workers and reload once to pick up fresh assets.
+      // This fixes the "blank page on first load, works after Ctrl+Shift+R" bug.
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister().then(() => {
-              console.log('SW unregistered');
-              // Optionally reload to take effect immediately
-              // window.location.reload();
+          var unregistered = registrations.length > 0;
+          var pending = registrations.length;
+          if (pending === 0) return;
+          registrations.forEach(function(registration) {
+            registration.unregister().then(function() {
+              pending--;
+              if (pending === 0 && unregistered) {
+                // Only reload once after all SWs are gone
+                if (!sessionStorage.getItem('sw_cleared')) {
+                  sessionStorage.setItem('sw_cleared', '1');
+                  window.location.reload();
+                }
+              }
             });
-          }
+          });
         });
       }
     </script>
@@ -33,16 +42,6 @@
     </script>
   </head>
   <body>
-    <div id="error-log" style="color:red; background:white; position:fixed; z-index:999999; top:0; left:0;"></div>
-    <script>
-      window.onerror = function(msg, url, lineNo, columnNo, error) {
-        document.getElementById('error-log').innerText += "\n" + msg + " " + (error && error.stack ? error.stack : '');
-        return false;
-      };
-      window.onunhandledrejection = function(event) {
-        document.getElementById('error-log').innerText += "\nUnhandled Rejection: " + event.reason;
-      };
-    </script>
     <div id="root"></div>
     <div class="grain"></div>
     <script type="module" src="/src/index.tsx"></script>
