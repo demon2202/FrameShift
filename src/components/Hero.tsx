@@ -1,218 +1,202 @@
-import React, { useRef, useLayoutEffect } from 'react';
+import React, { useRef, useState, useLayoutEffect, useMemo } from 'react';
 import gsap from 'gsap';
 import ScrollTrigger from 'gsap/ScrollTrigger';
 import { motion } from 'framer-motion';
-import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGlobalContext } from '../context/GlobalContext';
-import { ContourBackground } from './ui/ContourBackground';
 import { OptimizedImage } from './ui/OptimizedImage';
 
-gsap.registerPlugin(ScrollTrigger);
-
 export const Hero: React.FC = () => {
-  const component = useRef<HTMLDivElement>(null);
-  const slider = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  const { posters, user } = useGlobalContext();
+    const component = useRef<HTMLDivElement>(null);
+    const slider = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
+    const { posters } = useGlobalContext();
+    const [activeIndex, setActiveIndex] = useState(0);
 
-  useLayoutEffect(() => {
-    if (!component.current || !slider.current) return;
+    const heroPosters = useMemo(() => {
+        if (!posters || posters.length === 0) return [];
+        return [...posters]
+            .sort((a, b) => (b.likes || 0) - (a.likes || 0))
+            .slice(0, 5);
+    }, [posters]);
 
-    const ctx = gsap.context(() => {
-      const panels = gsap.utils.toArray('.hero-panel');
-      
-      if (panels.length === 0) return;
+    useLayoutEffect(() => {
+        if (!component.current || !slider.current || heroPosters.length === 0) return;
 
-      gsap.to(panels, {
-        xPercent: -100 * (panels.length - 1),
-        ease: "none",
-        scrollTrigger: {
-          trigger: slider.current,
-          pin: true,
-          scrub: 1,
-          snap: 1 / (panels.length - 1),
-          end: () => "+=" + slider.current?.offsetWidth,
-        }
-      });
-    }, component);
+        gsap.registerPlugin(ScrollTrigger);
 
-    return () => ctx.revert();
-  }, [posters]);
-
-  const [dayIndex] = React.useState(() => Math.floor(Date.now() / (1000 * 60 * 60 * 24)));
-
-  const heroPosters = React.useMemo(() => {
-    if (!posters || posters.length === 0) return [];
-    
-    // Sort posters by likes descending
-    const sortedPosters = [...posters].sort((a, b) => (b.likes || 0) - (a.likes || 0));
-    
-    // Get the top trending posters (e.g., top 10)
-    const topPosters = sortedPosters.slice(0, 10);
-    
-    // Use the current day to select one poster, changing every 24 hours
-    const selectedPoster = topPosters[dayIndex % topPosters.length];
-    
-    return [selectedPoster];
-  }, [posters, dayIndex]);
-
-  return (
-    <div ref={component} className="relative w-full overflow-hidden bg-olive-dark text-cream">
-      <div ref={slider} className="h-screen w-full flex flex-nowrap">
-        
-        {/* Panel 1: Main Landing */}
-        <div className="hero-panel w-screen h-full flex-shrink-0 flex flex-col justify-between relative p-8 md:p-16 overflow-hidden">
-            <ContourBackground />
+        const ctx = gsap.context(() => {
+            const panels = gsap.utils.toArray('.hero-panel');
             
-            {/* Top Bar */}
-            <div className="flex justify-between items-start z-10">
-                <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 bg-neon-lime animate-pulse"></span>
-                    <span className="font-mono text-xs uppercase tracking-widest text-neon-lime">Est. 2025</span>
-                </div>
-                <div className="hidden md:block text-right">
-                    <p className="font-mono text-xs uppercase tracking-widest opacity-60">Digital Archive</p>
-                    <p className="font-mono text-xs uppercase tracking-widest opacity-60">Vol. 01</p>
-                </div>
-            </div>
+            // Pin the entire component wrapper instead of just the slider
+            gsap.to(panels, {
+                xPercent: -100 * (panels.length - 1),
+                ease: "none",
+                scrollTrigger: {
+                    trigger: component.current,
+                    pin: true,
+                    scrub: 1, 
+                    snap: 1 / (panels.length - 1),
+                    start: "top top",
+                    end: () => `+=${(panels.length - 1) * 100}%`,
+                    onUpdate: (self) => {
+                        const index = Math.round(self.progress * (panels.length - 1));
+                        setActiveIndex(index);
+                    }
+                }
+            });
+        }, component);
 
-            {/* Main Title */}
-            <div className="relative z-10 mix-blend-difference">
-                <motion.h1 
-                    initial="hidden"
-                    animate="visible"
-                    variants={{
-                        hidden: { opacity: 0 },
-                        visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-                    }}
-                    className="text-[15vw] md:text-[18vw] leading-[0.8] font-display font-black uppercase tracking-tighter text-cream flex overflow-hidden"
-                >
-                    {"Frame".split('').map((char, index) => (
-                        <motion.span
-                            key={index}
-                            variants={{
-                                hidden: { y: "100%" },
-                                visible: { y: 0, transition: { duration: 0.8, ease: [0.21, 1.02, 0.73, 1] } }
-                            }}
-                            className="inline-block"
-                        >
-                            {char}
-                        </motion.span>
-                    ))}
-                </motion.h1>
-                <motion.div 
-                    initial="hidden"
-                    animate="visible"
-                    variants={{
-                        hidden: { opacity: 0 },
-                        visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.3 } }
-                    }}
-                    className="flex items-center gap-4 md:gap-12"
-                >
-                    <h1 className="text-[15vw] md:text-[18vw] leading-[0.8] font-display font-black uppercase tracking-tighter text-neon-lime flex overflow-hidden">
-                        {"Shift".split('').map((char, index) => (
-                            <motion.span
-                                key={index}
-                                variants={{
-                                    hidden: { y: "100%" },
-                                    visible: { y: 0, transition: { duration: 0.8, ease: [0.21, 1.02, 0.73, 1] } }
-                                }}
-                                className="inline-block"
-                            >
-                                {char}
-                            </motion.span>
-                        ))}
-                    </h1>
-                    <motion.div 
-                        variants={{
-                            hidden: { opacity: 0, x: -20 },
-                            visible: { opacity: 1, x: 0, transition: { duration: 1, delay: 0.8, ease: "easeOut" } }
-                        }}
-                        className="hidden md:block max-w-xs"
+        return () => ctx.revert();
+    }, [heroPosters]);
+
+    if (heroPosters.length === 0) return <div className="h-screen bg-black" />;
+
+    return (
+        <div ref={component} className="relative h-screen bg-black overflow-hidden selection:bg-neon-lime selection:text-black z-10">
+            {/* 1. LAYER: ATMOSPHERE */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_100%)] pointer-events-none" />
+
+            {/* 2. LAYER: FIXED LEFT SIDEBAR */}
+            <div className="absolute left-0 top-0 h-full w-20 md:w-24 border-r border-white/5 flex flex-col justify-between items-center py-12 z-50 bg-black/80 backdrop-blur-3xl">
+                <div className="flex flex-col gap-10 items-center">
+                    <h1 
+                        className="text-white font-impact text-3xl rotate-[-90deg] whitespace-nowrap tracking-widest cursor-pointer hover:text-neon-lime transition-colors"
+                        onClick={() => navigate('/')}
                     >
-                        <p className="font-serif italic text-xl leading-tight text-cream/80">
-                            "The interface between human creativity and digital chaos."
-                        </p>
-                    </motion.div>
-                </motion.div>
-            </div>
-
-            {/* Bottom Bar */}
-            <div className="flex justify-between items-end z-10">
-                <motion.button 
-                    onClick={() => navigate(user ? '/explore' : '/login')}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="group flex items-center gap-4 px-8 py-4 bg-cream text-olive-dark font-bold uppercase tracking-widest hover:bg-neon-lime transition-colors"
-                >
-                    {user ? 'Start Creating' : 'Join the Archive'}
-                    <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-                </motion.button>
-                
-                <div className="flex items-center gap-2 text-cream/40 animate-bounce">
-                    <span className="font-mono text-xs uppercase tracking-widest">Scroll</span>
-                    <ArrowRight className="rotate-90" size={14} />
-                </div>
-            </div>
-        </div>
-
-        {/* Panel 2-5: Featured Posters */}
-        {heroPosters.map((poster, index) => (
-          <div key={poster.id} className="hero-panel w-screen h-full flex-shrink-0 flex items-center justify-center relative bg-olive-dark">
-             {/* Background Number */}
-             <span className="absolute top-0 left-0 text-[20vw] font-display font-black text-cream/5 leading-none select-none z-0">
-                0{index + 1}
-             </span>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 w-full h-full max-w-[1600px] mx-auto p-8 md:p-16 gap-8 md:gap-16 items-center z-10">
-                {/* Image Side */}
-                <div className="relative h-[60vh] md:h-[80vh] w-full group cursor-pointer" onClick={() => navigate('/login')}>
-                    <div className="absolute inset-0 bg-neon-lime transform translate-x-2 translate-y-2 transition-transform group-hover:translate-x-4 group-hover:translate-y-4" />
-                    <OptimizedImage 
-                        src={poster.imageUrl} 
-                        alt={poster.title}
-                        className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 border border-cream/10" 
-                        containerClassName="relative w-full h-full"
-                    />
-                    <div className="absolute top-4 right-4 bg-cream text-olive-dark p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ArrowUpRight size={24} />
-                    </div>
+                        
+                    </h1>
+                    <div className="h-20 w-[1px] bg-white/10" />
                 </div>
 
-                {/* Text Side */}
-                <div className="flex flex-col justify-center h-full">
-                    <div className="mb-8">
-                        <div className="flex items-center gap-3 mb-4">
-                            <OptimizedImage 
-                                src={poster.creator?.avatar} 
-                                alt={poster.creator?.username || 'unknown'} 
-                                className="w-10 h-10 rounded-full border border-cream/20 object-cover" 
-                                containerClassName="w-10 h-10 rounded-full"
-                            />
-                            <div>
-                                <p className="font-bold text-cream uppercase tracking-wide">{poster.creator?.name || 'Unknown'}</p>
-                                <p className="font-mono text-xs text-neon-lime uppercase tracking-widest">@{poster.creator?.username || 'unknown'}</p>
-                            </div>
+                <div className="flex flex-col gap-8 items-center">
+                    {[1, 2, 3, 4, 5].map((num, i) => (
+                        <div 
+                            key={num}
+                            className={`flex flex-col items-center gap-2 transition-all duration-500 ${activeIndex === i ? 'scale-110' : 'opacity-20'}`}
+                        >
+                             <span className={`text-[10px] font-impact ${activeIndex === i ? 'text-white' : 'text-white/40'}`}>
+                                0{num}
+                            </span>
+                            {activeIndex === i && (
+                                <motion.div 
+                                    layoutId="nav-dot-hero"
+                                    className="w-1 h-1 bg-neon-lime rounded-full" 
+                                />
+                            )}
                         </div>
-                        <h2 className="text-4xl sm:text-6xl md:text-8xl font-display font-black text-cream uppercase leading-[0.85] tracking-tighter mb-4 sm:mb-6">
-                            {poster.title}
-                        </h2>
-                        <p className="text-cream/60 font-serif italic text-2xl max-w-md">
-                            {poster.description || "A visual exploration of form and void."}
+                    ))}
+                </div>
+
+                <div className="rotate-[-90deg] whitespace-nowrap">
+                    <span className="cinematic-text text-white/20 text-[8px] font-bold tracking-[0.4em]">STABLE_CORE</span>
+                </div>
+            </div>
+
+            {/* 3. LAYER: TOP NAVIGATION */}
+            <div className="absolute top-0 left-24 right-0 h-20 flex items-center justify-between px-12 z-40 bg-gradient-to-b from-black/50 to-transparent">
+                <div className="flex items-center gap-4">
+                    <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
+                    <span className="cinematic-text text-white/50 font-bold text-[9px] tracking-[0.2em]">TRANSMISSION_LIVE</span>
+                </div>
+            </div>
+
+            {/* 4. LAYER: MAIN SCROLLER */}
+            <div ref={slider} className="flex h-full relative z-10 will-change-transform">
+                
+                {/* Intro Panel */}
+                <div className="hero-panel w-screen h-full flex-shrink-0 flex flex-col justify-center pl-32 md:pl-48 pr-12 bg-black relative">
+                    <div className="max-w-4xl">
+                        <motion.h1 
+                            initial={{ opacity: 0, x: -100 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="text-white text-[15vw] md:text-[10rem] font-impact leading-[0.8] tracking-tighter uppercase mb-12"
+                        >
+                            FRAME<br/><span className="text-neon-lime">SHIFT</span>
+                        </motion.h1>
+
+                        <p className="text-white/60 text-2xl font-comic leading-relaxed max-w-xl border-l-4 border-neon-lime pl-8 mb-12 uppercase italic">
+                            A curated digital archive of the visual underground.
                         </p>
-                    </div>
-                    
-                    <div className="flex gap-4">
-                        <button onClick={() => navigate(user ? '/explore' : '/login')} className="px-8 py-3 border border-cream/20 text-cream font-mono text-xs uppercase tracking-widest hover:bg-cream hover:text-olive-dark transition-colors">
-                            {user ? 'View Project' : 'Member Access'}
+
+                        <button 
+                            onClick={() => navigate('/login')}
+                            className="px-12 py-6 bg-white text-black font-impact text-xl tracking-widest hover:bg-neon-lime transition-all uppercase shadow-[12px_12px_0px_#222]"
+                        >
+                            ACCESS TERMINAL
                         </button>
                     </div>
                 </div>
-             </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+
+                {/* Featured Poster Panels */}
+                {heroPosters.slice(0, 3).map((poster, index) => (
+                    <div key={poster.id} className="hero-panel w-screen h-full flex-shrink-0 flex items-center justify-center pl-32 md:pl-48 pr-12 relative bg-black">
+                        <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+                            
+                            {/* Visual */}
+                            <div className="relative group">
+                                <motion.div 
+                                    className="relative w-full max-w-md aspect-[3/4] border-4 border-white shadow-[20px_20px_0px_rgba(204,255,0,0.5)] overflow-hidden cursor-pointer"
+                                    onClick={() => navigate(`/poster/${poster.id}`)}
+                                >
+                                    <OptimizedImage 
+                                        src={poster.imageUrl} 
+                                        alt={poster.title}
+                                        className="w-full h-full object-cover grayscale brightness-50 group-hover:grayscale-0 group-hover:brightness-100 transition-all duration-1000"
+                                        containerClassName="w-full h-full"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-transparent transition-colors duration-500" />
+                                </motion.div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex flex-col gap-10">
+                                <span className="font-impact text-neon-lime text-3xl tracking-[0.2em]">EXHIBIT_0{index + 1}</span>
+                                
+                                <h2 className="text-white text-7xl md:text-[8rem] font-impact leading-none uppercase tracking-tighter mix-blend-difference">
+                                    {poster.title}
+                                </h2>
+
+                                <div className="flex flex-col gap-8">
+                                    <p className="text-white/40 font-comic text-2xl italic max-w-sm">
+                                        "{poster.description || "A study in digital chaos and structural evolution."}"
+                                    </p>
+
+                                    <button 
+                                        onClick={() => navigate(`/poster/${poster.id}`)}
+                                        className="w-max px-10 py-5 bg-neon-lime text-black font-impact text-lg uppercase tracking-widest hover:bg-white transition-all shadow-[8px_8px_0px_#444]"
+                                    >
+                                        VIEW ENTRY
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+
+                {/* Final CTA Panel */}
+                <div className="hero-panel w-screen h-full flex-shrink-0 flex items-center justify-center bg-neon-lime">
+                    <div className="text-center">
+                        <h2 className="text-[14vw] font-impact text-black leading-[0.8] uppercase mb-16">
+                            READY TO<br/>CREATE?
+                        </h2>
+                        <button 
+                            onClick={() => navigate('/login')}
+                            className="px-20 py-10 bg-black text-white font-impact text-5xl uppercase tracking-widest hover:scale-110 transition-all shadow-[20px_20px_0px_white]"
+                        >
+                            START NOW
+                        </button>
+                        <p className="mt-12 font-comic text-black/60 text-2xl uppercase tracking-widest">Join the Vanguard</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* 5. LAYER: FOOTER */}
+            <div className="absolute bottom-0 left-24 right-0 h-16 flex items-center justify-between px-12 z-40 bg-gradient-to-t from-black/50 to-transparent">
+                <span className="cinematic-text text-white/20 text-[8px] font-bold tracking-[0.2em]">P.VERSE_SYSTEM_V1.0</span>
+            </div>
+        </div>
+    );
 };

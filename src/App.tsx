@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Home } from './pages/Home';
 import { Explore } from './pages/Explore';
 import { Profile } from './pages/Profile';
@@ -48,6 +48,90 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
+const AnimatedRoutes: React.FC = () => {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={
+          <PageTransition>
+            <Home />
+          </PageTransition>
+        } />
+        <Route path="/login" element={
+          <PageTransition>
+            <Login />
+          </PageTransition>
+        } />
+        <Route path="/explore" element={
+          <PageTransition>
+            <Explore />
+          </PageTransition>
+        } />
+        
+        {/* Fix for external links/params trying to route to stories-rail */}
+        <Route path="/stories-rail" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
+        <Route path="/stories-rail/" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
+        
+        {/* Protected Routes */}
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <Profile />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/profile/:userId" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <Profile />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/analytics" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <Analytics />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/messages" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <Messages />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+      </Routes>
+    </AnimatePresence>
+  );
+};
+
+const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
 const AppContent: React.FC = () => {
   const { isLoading } = useGlobalContext();
   const [minTimePassed, setMinTimePassed] = useState(false);
@@ -82,49 +166,7 @@ const AppContent: React.FC = () => {
         >
           <HashRouter>
             <AppLayout>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/explore" element={<Explore />} />
-                
-                {/* Fix for external links/params trying to route to stories-rail */}
-                <Route path="/stories-rail" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
-                <Route path="/stories-rail/" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
-                
-                {/* Protected Routes */}
-                <Route 
-                  path="/profile" 
-                  element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/profile/:userId" 
-                  element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/analytics" 
-                  element={
-                    <ProtectedRoute>
-                      <Analytics />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/messages" 
-                  element={
-                    <ProtectedRoute>
-                      <Messages />
-                    </ProtectedRoute>
-                  } 
-                />
-              </Routes>
+              <AnimatedRoutes />
             </AppLayout>
           </HashRouter>
         </motion.div>
