@@ -18,7 +18,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-cream dark:bg-neutral-900 text-olive-dark dark:text-cream transition-colors duration-300">
       <div className="grain" />
-      <main className={`flex-1 w-full pb-16 md:pb-0`}>
+      <main className="flex-1 w-full pb-16 md:pb-0">
         {children}
       </main>
       <BottomNav />
@@ -49,58 +49,41 @@ const AnimatedRoutes: React.FC = () => {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/" element={
-          <PageTransition><Home /></PageTransition>
-        } />
-        <Route path="/login" element={
-          <PageTransition><Login /></PageTransition>
-        } />
-        <Route path="/explore" element={
-          <PageTransition><Explore /></PageTransition>
-        } />
+        <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+        <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
+        <Route path="/explore" element={<PageTransition><Explore /></PageTransition>} />
 
-        {/* Fix for external links/params trying to route to stories-rail */}
         <Route path="/stories-rail" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
         <Route path="/stories-rail/" element={<Navigate to="/" replace state={{ scrollTo: 'stories-rail' }} />} />
 
         {/* Protected Routes */}
         <Route path="/profile" element={
-          <ProtectedRoute>
-            <PageTransition><Profile /></PageTransition>
-          </ProtectedRoute>
+          <ProtectedRoute><PageTransition><Profile /></PageTransition></ProtectedRoute>
         } />
         <Route path="/profile/:userId" element={
-          <ProtectedRoute>
-            <PageTransition><Profile /></PageTransition>
-          </ProtectedRoute>
+          <ProtectedRoute><PageTransition><Profile /></PageTransition></ProtectedRoute>
         } />
         <Route path="/analytics" element={
-          <ProtectedRoute>
-            <PageTransition><Analytics /></PageTransition>
-          </ProtectedRoute>
+          <ProtectedRoute><PageTransition><Analytics /></PageTransition></ProtectedRoute>
         } />
         <Route path="/messages" element={
-          <ProtectedRoute>
-            <PageTransition><Messages /></PageTransition>
-          </ProtectedRoute>
+          <ProtectedRoute><PageTransition><Messages /></PageTransition></ProtectedRoute>
         } />
       </Routes>
     </AnimatePresence>
   );
 };
 
-const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {children}
-    </motion.div>
-  );
-};
+const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -20 }}
+    transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+  >
+    {children}
+  </motion.div>
+);
 
 const AppContent: React.FC = () => {
   const { isLoading } = useGlobalContext();
@@ -108,24 +91,20 @@ const AppContent: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Minimum skeleton display time so it doesn't flash
-    const timer = setTimeout(() => {
-      setMinTimePassed(true);
-    }, 2500);
+    // Show skeleton for at least 2.5s so it doesn't flash
+    const minTimer = setTimeout(() => setMinTimePassed(true), 2500);
 
-    // Safety valve — never block the user longer than 4 seconds
-    const safetyTimer = setTimeout(() => {
-      setIsReady(true);
-    }, 4000);
+   
+    const hardCap = setTimeout(() => setIsReady(true), 11000);
 
     return () => {
-      clearTimeout(timer);
-      clearTimeout(safetyTimer);
+      clearTimeout(minTimer);
+      clearTimeout(hardCap);
     };
   }, []);
 
   useEffect(() => {
-    // Show app as soon as Firebase auth resolves AND min time has passed
+    // Show app the moment Firebase auth resolves AND min skeleton time has passed
     if (!isLoading && minTimePassed) {
       setIsReady(true);
     }
@@ -150,7 +129,6 @@ const AppContent: React.FC = () => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4 }}
         >
-          {/* HashRouter is now in App below — no router here */}
           <AppLayout>
             <AnimatedRoutes />
           </AppLayout>
@@ -162,8 +140,6 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    // HashRouter wraps everything so routing context is ALWAYS available,
-    // even during the loading/skeleton phase. This fixes the blank-on-first-load bug.
     <HashRouter>
       <GlobalProvider>
         <AppContent />
