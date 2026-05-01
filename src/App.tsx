@@ -93,8 +93,6 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     // Show skeleton for at least 2.5s so it doesn't flash
     const minTimer = setTimeout(() => setMinTimePassed(true), 2500);
-
-   
     const hardCap = setTimeout(() => setIsReady(true), 11000);
 
     return () => {
@@ -140,6 +138,7 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
+   
     <HashRouter>
       <GlobalProvider>
         <AppContent />
